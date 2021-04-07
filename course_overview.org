@@ -21,7 +21,7 @@ We put the schedule on top for your convenience.
 |    5 |        9 |                           | nvf      |
 |      |       10 |                           | nvf      |
 
-
+The section numbers refer to the sections in [[https://people.smp.uq.edu.au/DirkKroese/DSML/][DSML]].
 
 * Course goals
 
@@ -85,7 +85,7 @@ Each group has to review the report of an other group.
 
 * Literature
 
-Our primary book is [[https://people.smp.uq.edu.au/DirkKroese/DSML/][Kroeze, Data Science and Machine Learning]].
+Our primary book is [[https://people.smp.uq.edu.au/DirkKroese/DSML/][Kroeze, Data Science and Machine Learning (DSML)]].
 
 There are other, non-obligatory, sources that you might like to consult:
 
