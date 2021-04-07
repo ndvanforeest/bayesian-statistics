@@ -2,60 +2,63 @@
 #+author: dr. N.D.  van Foreest
 #+date: 2020:09:01
 
-#+LATEX_CLASS_OPTIONS: [a4paper]
-#+LATEX_HEADER: \usepackage{a4wide}
-#+LATEX_HEADER: \usepackage{minted}
-#+LATEX_HEADER: \setminted[python]{linenos=true}
-#+LATEX_HEADER: \setminted[python]{frame=lines}
-#+LATEX_HEADER: \usepackage{mathpazo}
-
-
-#+STARTUP: indent hidestars showall
-
+#+include: preamble.org
+#+STARTUP: showall
 
 * Schedule
+We put the schedule on top for your convenience.
 
+| Week | Schedule | Section                   | Lecturer |
+|------+----------+---------------------------+----------|
+|    1 |        1 | General                   | avv      |
+|      |        2 | 2.1-2.5                   | avv      |
+|    2 |        3 | 4.4                       | avv      |
+|      |        4 | 5.1-5.3, 5.5-5.9, 6.1-6.2 | avv      |
+|    3 |        5 | 7.1, 7.2, 7.4-7.6, 7.8    | avv      |
+|      |        6 | Ch 8                      | avv      |
+|    4 |        7 | Coding                    | nvf      |
+|      |        8 |                           | nvf      |
+|    5 |        9 |                           | nvf      |
+|      |       10 |                           | nvf      |
 
-| Week | Schedule | Topic              | Lecturer |
-|------+----------+--------------------+----------|
-|    1 |        1 | Econometrics vs ML | avv      |
-|      |        2 |                    | avv      |
-|    2 |        3 |                    | avv      |
-|      |        4 | Kernel methods     | nvf      |
-|    3 |        5 |                    | avv      |
-|      |        6 |                    | nvf      |
-|    4 |        7 |                    | avv      |
-|      |        8 |                    | nvf      |
-|    5 |        9 |                    | avv      |
-|      |       10 |                    | nvf      |
-
-- Since this is the first time we use this book, we need to build up some experience about a reasonable reading load per week.
-- The lectures of A van Vuuren (avv)  focus on  theoretical aspects of machine learning
-- The lectures of N van Foreest (nvf) focus on computational aspects  of machine learning (implementation in python)
 
 
 * Course goals
 
-During the course, the student
-- Obtains an overview of the main methods used for statistical learning
-- Can apply several statistical concepts to assess learning models and selection/classification methods
-- Can implement the discussed methods and concepts in working algorithms and code
-- Can find and use toolboxes available on-line, e.g. Tensorflow
-- Can apply the concepts and methods to real-life problems
+After this course the student should be able to understand
+
+1. the relationship between machine learning and classical econometrics.
+2. the principles of machine learning methods including model selection based on cross validation.
+3. understand the main algorithms of machine learning such as Ridge, Lasso, Nearest neigbors and trees.
+4. Implement the core of the algorithms  in Python (R, C++, etc) code. The aim is to understand how the algorithms work.
+5. Apply the algorithms on realistic practical problems with or without the help of statistical data packages such as scikit-learn.
 
 * Course description
 
-As this is the last course in the master, we expect students to be able to study a book more or less independently (or otherwise develop this skill very rapidly).
-Students are expected to read most of the reading material themselves, and formulate questions on parts they do not understand, of for which they need further context.
-During the lectures we will discuss these problems and questions.
-Students have to turn in these questions a few days before the actual lecture.
+The last couple of decades of statistical data analysis have been characterized by an increased emphasis on algorithms that can be described under the name of machine learning or big data. These methods have been successfully applied to the prediction of face recognition (Facebook), and predicting consumer preferences for movies (Netflix). They are also widely used in industry to  decide whether just produced items match some quality criteria or not.  Finallly, in medicine algorithms can help staff to classify tumors, and so on.
 
-There will be lectures during the first five course weeks.
-For the last two weeks of the course, we make groups of two students.
-Each group has to choose a technique or method (from one of the books below)  which the members of the group are interested in learning.
+In this course we consider the principles of this algorithmic approach during  in the lecture. We also look at practical examples and apply the algorithms in Python and compare our outcomes with existing software such as scikit-learn.
+
+The topics that we deal with are the following:
+1. Introductory to machine learning for the econometrician.
+2. Principles of machine learning and kernel estimation methods.
+3. Nonparametric estimation methods
+4. Linear algorithms for prediction (Lasso, ridge)
+5. Algorithms for classification.
+6. Trees, bagging, random forests and boosting.
+
+
+
+
+* Exam and Grading
+
+
+** Report
+
+Students in groups of two write a report.
+Each group has to choose a method (from the primary book, or from one of the other sourcesbelow) which the members of the group are interested in learning.
 The group has to find a problem on the internet with data to which to apply their method of choice.
-The group writes a brief report, in LaTeX.
-The core of the report is at most 5 pages, with name "groupno-title.pdf".
+The group writes a report, in LaTeX, of at most 10 pages, with name "groupno-title.pdf".
 The contents are like this:
 
 - Cover page: title, student names and student id, course code, year
@@ -64,50 +67,38 @@ The contents are like this:
   - Data description (origin of data, data analysis/outliers, filtering methods applied), discussion of why that data is suitable. Use graphs where possible. Include small tables to explain the format of the data.
   - Methods: Why the method is chosen, suitability for the problem at hand, but also potential shortcomings.
   - Analysis, findings; use and discuss graphs.
-  - Conclusion: main findings, quality/reliability of findings, evaluation of chosen methods) and extensions
+  - Conclusion: main findings, quality/reliability of findings, evaluation of chosen methods, and extensions.
 - Appendix with code whose core parts are documented
 
+The report is due at Friday 23.59 of week 7 of the course.
+
+** Oral exam
+
+At the end of the course we invite the groups to explain their work in a oral exam, and we determine a grade
 
 
-* Exam and Grading
+** Review of other report
+Each group has to review the report of an other group.
 
-There will be a 2 h exam at the end of the course.
-This exam will be closed book, and focuses on the theory of the book.
-We will ask you to explain
-- derivations in the mathematics
-- crucial parts/aspects of an algorithm
-- strengths and weaknesses of certain methods and tests
-
-If technically possible at the exam, we will also ask you to apply/adapt methods we discussed in class to concrete data.
-
-
-Let the grades of the exam and report be  $e$ and $r$, respectively, then the final grade will be computed like this.
-
-#+BEGIN_SRC python
-def compute_grade(e, r):
-    if e < 5 or r < 5:
-        g = min(e, r)
-    else:
-        g = max(0.5 * e + 0.5 * r, e)
-
-    return int(g + 0.5) # rounding
-#+END_SRC
-
+** Grade
+ 80 % report, 10 % oral exam, 10 % review.
 
 * Literature
 
-As background material our primary source is the book of Hastie, Tibshirani and Friedman.
-However, you should definitely consult the other sources below; perhaps one of those fits better with your way of understanding things or your interest. For your report, you can use material of any of these books, but include references.
+Our primary book is [[https://people.smp.uq.edu.au/DirkKroese/DSML/][Kroeze, Data Science and Machine Learning]].
 
-- [[https://web.stanford.edu/~hastie/ElemStatLearn/][Hastie, The Elements of Statistical Learning]]
+There are other, non-obligatory, sources that you might like to consult:
+
+- [[https://www.ime.unicamp.br/~dias/Intoduction%20to%20Statistical%20Learning.pdf][James, Witen, Hastie, Tibshirani: Introduction to Stastical Learning]]
+- [[https://web.stanford.edu/~hastie/ElemStatLearn/][Hastie, Tibshirani, and Friedman:The Elements of Statistical Learning]]
 - [[https://web.stanford.edu/~hastie/CASI/][Hastie and Efron, Computer Age Statistical Inference: Algorithms, Evidence and Data Science]]
 - [[https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf][Bishop, Pattern Recognition and Machine Learning]]
-- [[https://people.smp.uq.edu.au/DirkKroese/DSML/][Kroeze, Data Science and Machine Learning]]
 
 
 
 
 *  Interesting research topics
+Here are some topics that you might find interesting. They may serve as inspiration for your own paper.
 
 
 - https://www.sciencealert.com/mammal-extinctions-are-speeding-up-with-unprecedented-magnitude-scientists-warn
