@@ -10,15 +10,15 @@ We put the schedule on top for your convenience.
 
 | Week | Schedule | Section                   | Lecturer |
 |------+----------+---------------------------+----------|
-|    1 |        1 | General                   | avv      |
+|    1 |        1 | Ch 1                      | avv      |
 |      |        2 | 2.1-2.5                   | avv      |
 |    2 |        3 | 4.4                       | avv      |
-|      |        4 | 5.1-5.3, 5.5-5.9, 6.1-6.2 | avv      |
-|    3 |        5 | 7.1, 7.2, 7.4-7.6, 7.8    | avv      |
-|      |        6 | Ch 8                      | avv      |
-|    4 |        7 | Coding                    | nvf      |
+|      |        4 | coding                    | nvf      |
+|    3 |        5 | 5.1-5.3, 5.5-5.9, 6.1-6.2 | avv      |
+|      |        6 | coding                    | nvf      |
+|    4 |        7 | 7.1, 7.2, 7.4-7.6, 7.8    | avv      |
 |      |        8 |                           | nvf      |
-|    5 |        9 |                           | nvf      |
+|    5 |        9 | Ch 8                      | nvf      |
 |      |       10 |                           | nvf      |
 
 The section numbers refer to the sections in [[https://people.smp.uq.edu.au/DirkKroese/DSML/][DSML]].
@@ -41,7 +41,7 @@ In this course we consider the principles of this algorithmic approach during  i
 
 The topics that we deal with are the following:
 1. Introductory to machine learning for the econometrician.
-2. Principles of machine learning and kernel estimation methods.
+2. Principles of machine learning
 3. Nonparametric estimation methods
 4. Linear algorithms for prediction (Lasso, ridge)
 5. Algorithms for classification.
