@@ -1,27 +1,10 @@
 #+title: Bayesian Statistics, course outline
-#+author: dr. N.D.  van Foreest
-#+date: 2020:09:01
+#+author: dr. N.D.  van Foreest, prof. dr. A. van Vuuren
 
 #+include: preamble.org
 #+STARTUP: showall
-
-* Schedule
-We put the schedule on top for your convenience.
-
-| Week | Schedule | Section                   | Lecturer |
-|------+----------+---------------------------+----------|
-|    1 |        1 | Ch 1                      | avv      |
-|      |        2 | 2.1-2.5                   | avv      |
-|    2 |        3 | 4.4                       | avv      |
-|      |        4 | coding                    | nvf      |
-|    3 |        5 | 5.1-5.3, 5.5-5.9, 6.1-6.2 | avv      |
-|      |        6 | coding                    | nvf      |
-|    4 |        7 | 7.1, 7.2, 7.4-7.6, 7.8    | avv      |
-|      |        8 |                           | nvf      |
-|    5 |        9 | Ch 8                      | nvf      |
-|      |       10 |                           | nvf      |
-
-The section numbers refer to the sections in [[https://people.smp.uq.edu.au/DirkKroese/DSML/][DSML]].
+#+OPTIONS: toc:nil
+#+latex_header: \usepackage{a4wide}
 
 * Course goals
 
@@ -50,38 +33,67 @@ The topics that we deal with are the following:
 
 
 
+* Schedule
+Here is a preliminary schedule. We rely on you to give us feedback on whether the pace of the lectures is right/too fast/too slow.
+
+| Week | Schedule | Section                    | Lecturer |
+|------+----------+----------------------------+----------|
+|    1 |        1 | Ch 1                       | avv      |
+|      |        2 | 2.1-2.5                    | avv      |
+|    2 |        3 | 4.4                        | avv      |
+|      |        4 | coding                     | nvf      |
+|    3 |        5 | 5.1-5.3, 5.5-5.7, 6.1-6.2  | avv      |
+|      |        6 | coding                     | nvf      |
+|    4 |        7 | coding                     | nvf      |
+|    5 |        8 | 7.1, 7.2, 7.4-7.6, 7.8     | avv      |
+|      |        9 | coding                     | nvf      |
+|    6 |       10 | Ch 8                       | avv      |
+|      |       11 | coding/writing report      | nvf      |
+|    7 |       11 | Ch 8                       | avv      |
+|      |       12 | coding/writing report      | nvf      |
+|    8 |       13 | No lectures/writing report | avv/nvf  |
+|      |       14 | No lecture/writing report  | avv/nvf  |
+
+The section numbers refer to the sections in [[https://people.smp.uq.edu.au/DirkKroese/DSML/][DSML]].
+
 * Exam and Grading
 
 
 ** Report
 
-Students in groups of two write a report.
+Students in groups of three write a report.
 Each group has to choose a method (from the primary book, or from one of the other sourcesbelow) which the members of the group are interested in learning.
 The group has to find a problem on the internet with data to which to apply their method of choice.
 The group writes a report, in LaTeX, of at most 10 pages, with name "groupno-title.pdf".
 The contents are like this:
 
-- Cover page: title, student names and student id, course code, year
+- Cover page: title, student names and student numbers, course code, year
 - Core:
   - Intro, problem description
+  - Literature, what published work is suitable for the problem.
   - Data description (origin of data, data analysis/outliers, filtering methods applied), discussion of why that data is suitable. Use graphs where possible. Include small tables to explain the format of the data.
   - Methods: Why the method is chosen, suitability for the problem at hand, but also potential shortcomings.
   - Analysis, findings; use and discuss graphs.
   - Conclusion: main findings, quality/reliability of findings, evaluation of chosen methods, and extensions.
-- Appendix with code whose core parts are documented
+- Appendix with code whose core parts are documented. (Don't include long tables with data, because we (=avv and nvf) will just skip them.)
 
-The report is due at Friday 23.59 of week 7 of the course.
+The report is due at Friday June 4 23h59 (last Friday of the lecture weeks).
+
+** Review of other report
+Each group has to review the report of an other group. The review should discuss the quality of
+- The writing/presentation of the report, use of graphs, tables.
+- Data analysis
+- Assessement of the used model and suitability
+- Findings and conclusions: are the claims based on the analysis, are the claims convincing.
+Due date: Wednesday after the due date of the report.
 
 ** Oral exam
 
-At the end of the course we invite the groups to explain their work in a oral exam, and we determine a grade
+At the end of the course we invite the groups to explain their work in an oral exam, and we determine a grade.
 
-
-** Review of other report
-Each group has to review the report of an other group.
 
 ** Grade
- 80 % report, 10 % oral exam, 10 % review.
+ 60 % report, 20 % oral exam, 20 % review.
 
 * Literature
 
@@ -100,7 +112,7 @@ There are other, non-obligatory, sources that you might like to consult:
 *  Interesting research topics
 Here are some topics that you might find interesting. They may serve as inspiration for your own paper.
 
-
+- [[https://machinelearningmastery.com/neural-network-for-cancer-survival-dataset/]]
 - https://www.sciencealert.com/mammal-extinctions-are-speeding-up-with-unprecedented-magnitude-scientists-warn
 - https://www.pnas.org/content/114/37/9859
 - https://www.theseattledataguy.com/healthcare-fraud-detection-with-python/
@@ -116,4 +128,4 @@ Here are some topics that you might find interesting. They may serve as inspirat
 * Contact info
 
 - Prof. dr. A.P. van Vuuren, a.p.van.vuuren@rug.nl
-- dr. N.D. van Foreest, n.d.van.foreest@rug.nl)
+- dr. N.D. van Foreest, n.d.van.foreest@rug.nl, coordinator
