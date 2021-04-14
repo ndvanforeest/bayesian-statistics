@@ -1,0 +1,8 @@
+#+TITLE: report template
+#+author: Nicky van Foreest
+
+Just fork this repo to download all files.
+Like this all authors work with the same abbreviations, and so on.
+If you use the subfiles package, like we do here, you can work independently on the several files.
+(Read the docs on the subfiles package.)
+It makes your life consiserably easier.
