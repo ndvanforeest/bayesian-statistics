@@ -1,0 +1,16 @@
+auto/
+*.aux
+*.blg
+*.el
+*.idx
+*.idl
+*.ilg
+*.ind
+*.log
+*.out
+*.png
+*.pdf
+*.rel
+*.toc
+*.pytxcode
+_minted*/

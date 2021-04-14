@@ -36,56 +36,32 @@ The topics that we deal with are the following:
 * Schedule
 Here is a preliminary schedule. We rely on you to give us feedback on whether the pace of the lectures is right/too fast/too slow.
 
-| Week | Schedule | Section                    | Lecturer |
-|------+----------+----------------------------+----------|
-|    1 |        1 | Ch 1                       | avv      |
-|      |        2 | 2.1-2.5                    | avv      |
-|    2 |        3 | 4.4                        | avv      |
-|      |        4 | coding                     | nvf      |
-|    3 |        5 | 5.1-5.3, 5.5-5.7, 6.1-6.2  | avv      |
-|      |        6 | coding                     | nvf      |
-|    4 |        7 | coding                     | nvf      |
-|    5 |        8 | 7.1, 7.2, 7.4-7.6, 7.8     | avv      |
-|      |        9 | coding                     | nvf      |
-|    6 |       10 | Ch 8                       | avv      |
-|      |       11 | coding/writing report      | nvf      |
-|    7 |       11 | Ch 8                       | avv      |
-|      |       12 | coding/writing report      | nvf      |
-|    8 |       13 | No lectures/writing report | avv/nvf  |
-|      |       14 | No lecture/writing report  | avv/nvf  |
+| Week | day | Schedule | Section                   | Lecturer |
+|------+-----+----------+---------------------------+----------|
+|    1 | W   |        1 | Ch 1                      | avv      |
+|      | F   |        2 | 2.1-2.5                   | avv      |
+|    2 | W   |        3 | 4.4                       | avv      |
+|      | F   |        4 | coding                    | nvf      |
+|    3 | W   |        5 | 5.1-5.3, 5.5-5.7, 6.1-6.2 | avv      |
+|      | F   |        6 | coding                    | nvf      |
+|    4 | F   |        7 | 7.1, 7.2, 7.4-7.6, 7.8    | avv      |
+|    5 | W   |        8 | Ch 8                      | avv      |
+|      | F   |        9 | coding                    | nvf      |
+|    6 | F   |       10 | Ch 8                      | avv      |
+|      | F   |       11 | coding                    | nvf      |
+|    7 | W   |       11 | coding                    | nvf      |
+|      | F   |       12 | coding/writing report     | nvf      |
+|    8 | W   |       13 | codding/writing report    | nvf      |
+|      | F   |       14 | No lecture/writing report | avv/nvf  |
 
 The section numbers refer to the sections in [[https://people.smp.uq.edu.au/DirkKroese/DSML/][DSML]].
 
 * Exam and Grading
 
 
-** Report
+** Report and duedates.
 
-Students in groups of three write a report.
-Each group has to choose a method (from the primary book, or from one of the other sourcesbelow) which the members of the group are interested in learning.
-The group has to find a problem on the internet with data to which to apply their method of choice.
-The group writes a report, in LaTeX, of at most 10 pages, with name "groupno-title.pdf".
-The contents are like this:
-
-- Cover page: title, student names and student numbers, course code, year
-- Core:
-  - Intro, problem description
-  - Literature, what published work is suitable for the problem.
-  - Data description (origin of data, data analysis/outliers, filtering methods applied), discussion of why that data is suitable. Use graphs where possible. Include small tables to explain the format of the data.
-  - Methods: Why the method is chosen, suitability for the problem at hand, but also potential shortcomings.
-  - Analysis, findings; use and discuss graphs.
-  - Conclusion: main findings, quality/reliability of findings, evaluation of chosen methods, and extensions.
-- Appendix with code whose core parts are documented. (Don't include long tables with data, because we (=avv and nvf) will just skip them.)
-
-The report is due at Friday June 4 23h59 (last Friday of the lecture weeks).
-
-** Review of other report
-Each group has to review the report of an other group. The review should discuss the quality of
-- The writing/presentation of the report, use of graphs, tables.
-- Data analysis
-- Assessement of the used model and suitability
-- Findings and conclusions: are the claims based on the analysis, are the claims convincing.
-Due date: Wednesday after the due date of the report.
+See the report template directory on github.
 
 ** Oral exam
 
@@ -99,7 +75,7 @@ At the end of the course we invite the groups to explain their work in an oral e
 
 Our primary book is [[https://people.smp.uq.edu.au/DirkKroese/DSML/][Kroeze, Data Science and Machine Learning (DSML)]].
 
-There are other, non-obligatory, sources that you might like to consult:
+There are other, non-obligatory, sources that you might like to consult. I liked in particular the first for an intuitive, high-level, overview of the topics and problems.
 
 - [[https://www.ime.unicamp.br/~dias/Intoduction%20to%20Statistical%20Learning.pdf][James, Witen, Hastie, Tibshirani: Introduction to Stastical Learning]]
 - [[https://web.stanford.edu/~hastie/ElemStatLearn/][Hastie, Tibshirani, and Friedman:The Elements of Statistical Learning]]
