@@ -1,0 +1,429 @@
+#+title: Bayesian statistics
+#+subtitle: Data reading and regression, lecture 4/1
+#+author: Nicky van Foreest
+#+date: \today
+
+
+#+STARTUP: overview
+#+OPTIONS:  toc:1 H:2
+
+# +include: ../preamble_presentation.org
+#+include: ../preamble_handout.org
+
+
+* Configuration for lecture                                        :noexport:
+
+# +begin_src emacs-lisp
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 4.0))
+(modus-themes-load-operandi)
+(set-face-attribute 'default nil :height 220)
+#+end_src
+
+And config back
+#+begin_src emacs-lisp
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 2.0))
+(modus-themes-load-vivendi)
+(set-face-attribute 'default nil :height 95)
+#+end_src
+
+C-u C-u C-c C-x C-l to preview all
+
+* General points
+- I'll focus on coding and code/implementation
+- In the lectures I intend to spend some time on general feedback on your reports and good style.
+- Goal of this lecture: give you some good advice on coding. As always with good advice, this is a bit messy.
+
+* Info on Programming
+
+** Why do you have to program things from scratch?
+What makes you different from other people?
+- Any marketeer/AI/economic student can call the standard tools of python and/or R to do machine learning/data analysis/neural networks.
+- When it comes to programming, there are plenty of better CS/physics/astronomy students.
+- When it comes to designing and improving optimization algorithms there are plenty of better physics/math students.
+You don't have an edge for standard situations, nor in the highly specific cases.
+
+** So why do you have to program?
+What makes you different from other people:
+- wrt marketeer/AI/economics student: You
+  - understand the basics/strength/weaknesses of the standard tools.
+  - make simple adaptations of the standard tools to non-standard situations
+  - collaborate with math/physics students to make `the next step.'
+- wrt all the others: good knowledge of statistics
+
+So, how do you learn to understand the strenghts and weaknesses of standard tools? By building them yourself!
+
+** Learning to program
+- Can you learn to play the piano in 10 days?
+- Can you learn a language (like Turkish) in 10 days?
+
+Such claims are outright ridiculous.
+- Magic bullets don't exist
+- Don't read books that claim you can learn python/java/whatever. Books like that are a waste of time.
+- Develop expertise, and take time to sort things out.
+
+
+
+** Programming environment and so on
+- Learning a good editor pays off at the end. Why?
+  - One tool for python, R, LaTeX, and so on.
+  - Otherwise you have to use lots of different IDEs, and that becomes tedious
+  - I use emacs. Others use notepad++.
+  - Using keybindings prevents RSI, to some extent
+- Jupyter with python or R, but I prefer org mode.
+- Perhaps it's best to choose one language (C++?), and become real good at it.
+
+
+** What (not) to program, general things
+In these notes I try to build many things from scratch. However, certain things I definitely don't build myself:
+
+- classical algorithms like sorting: Your own invented algorithm for classical problems is most surely wrong, misses corner cases, and is /very/ inefficient.
+- Date and time algorithms: leap years, weird rules for different countries, hence extremely tricky.
+- Database stuff: filtering, sorting, and so on.
+- Parsing HTML/XML:  use ~beautiful soup~.
+- Reading xls: use ~pandas~
+
+** What (not) to program, numerical things
+
+- Solving $A x = b$, for a matrix $A$ and vector $b$. This is a classical problem, which is used  in many optimization problems many (millions/billions?) times per  day.
+- Solving LP problems.
+- Advanced optimization algorithms
+- random number generation: extremely tricky  to find statistically sound and fast algorithms
+- Many numerical algorithms, e.g., $\int_0^{10} e^{-x^4/5} \d x$.
+
+So, I will freely use the above as black boxes. For the rest I'll try to build things from scratch.
+
+* Data analysis and testing
+
+** Motivation
+- In the slide below I want to illustrate:
+  - What to do when dealing with data
+  - What to do with code.
+    - Regulars want to *see* code documentation
+    - They want to *see* test suites.
+    - They want to *see* the output of runs of such tests.
+- It is  best  to automatize all such boring things, and use libraries to organize it.
+- Below is small demo for things I have to deal with.
+
+** Case, exam grading
+
+Things to do:
+- Get assignment grades from  nestor environment for the course
+- Get exam grades from  nestor environment for the exam
+- Get a list of students that signed up in progress. (Check)
+Problems:
+- Format of student numbers differs between nestor and progress.
+- Not all exam participants did (all)  assignments.
+- Not all students appear at the exam.
+- Students can have complicated names, with accents for instance.
+- There are cheaters who should receive a grade.
+
+** Reading exam and assignment grades
+
+#+begin_src python
+def get_exam_grade():
+    fname = r"gc_EXAM-EBP038A05-20210330_column_2021-04-13-15-27-45.xls"
+    df = pd.read_excel(fname, sheet_name=0)  # , skiprows=0)
+    number = df["Username"].apply(lambda x: int(x.replace("s", "")))
+    total = df["Total"].replace(np.nan, 0)
+    return {s: t for s, t in zip(number, total) if t > 0}
+#+end_src
+
+- Use the pandas library to read data
+- ~lambda x: int(x)~ is an anonymous function. Extremely practical for one-off tasks
+- Return a ~dict~. Practical for look ups.
+- Checks on ~nan~ (is `not any number') and ~t>0~.
+- Reading the assignments works similar.
+
+
+** Computing the grade, initial code
+
+#+begin_src python
+def compute_grade(a, e):
+    if e < 5:
+        g = e
+    elif a >= 6:
+        g = max(0.8 * e + 0.2 * a, e)
+    else:
+        g = 0.8 * e + 0.2 * a
+
+    return g
+#+end_src
+This appears OK, but is not. Why not?
+
+** Complications (as always)
+
+- Do the final grades lie in $\{1, \ldots, 10\}$?
+- Are grades actually computed correctly?
+- Are the  assignment and exam grades rounded to 1 decimal (these are intermediate grades)?
+- Are  the grades written to final file (for progress) equal to those that I computed?
+
+Do tests to check! For this, use test suites.
+
+** A simple test suite
+- Install ~pytest~
+- Make a test suite; here are two  examples:
+
+#+begin_src python
+def test_min_1():
+    assert compute_grade(7, 10) > 1
+    assert compute_grade(-8, 1) == 1
+    assert compute_grade(7, 0) == 1
+
+
+def test_max_10():
+    assert compute_grade(7, 11) == 10
+#+end_src
+
+And then a lot of such functions.
+
+** Output of the test
+Read the documentation of ~pytest~. Here is (some of) the output:
+
+#+begin_example
+collected 2 items
+
+compute_grades_example.py FF
+
+FAILED ::test_min_1 - assert 0 == 1
+FAILED ::test_max_10 - assert 11 == 10
+#+end_example
+
+
+** The larger benefit of test suites
+- Even if you build a small number of tests, you'll quickly spot many dumb mistakes.
+- If you change (parts of) the code (refactor), you just rerun the tests, and get (some) confidence in the correctness.
+
+- Simple cases: functions without side effects: e.g. $2+3$.
+- Hard cases: functions with side effects (write things to file or databases) and GUIs.
+
+
+** Computing the grade, step 2
+#+begin_src python
+
+cheaters = {
+    123456: "D. Dumm",
+    234567: "I. Idiot ",
+}
+
+def compute_grade_final():
+    final = {}
+    for s in sorted(exam.keys()):
+        if s in cheaters:
+            continue
+        e = exam[s]
+        a = assignment[s]
+        final[s] = compute_grade(a, e)
+    return final
+#+end_src
+
+The use of dicts is really practical here. We just run over the participants of the exam, and look up the rest of the data from the different dicts.
+
+** General advice
+
+- Use libraries like ~pandas~ to read data
+- Use smart python data structures such as dicts, sets, lists. They help you structure your ideas, and are very efficient.
+- Use test suites to check your work. In my personal work this is not extremely important. Most of my code is just to learn some concepts (research) and computations of grades and the like. Mistakes are easy to fix. My situation is not the same as yours!
+
+
+* Regression, direct approaches
+
+** Motivation/overview
+
+- I'll illustrate different methods and numerical considerations
+- I'll show strange code from the internet.
+- We use this for ridge regression later
+
+** Regression without a constant
+Minimize, for $\beta$:
+\begin{equation}
+f(\beta) = || y - X \beta ||^{2}
+\end{equation}
+
+Set the derivative wrt $\beta$ to zero:
+\begin{align}
+\label{eq:1}
+\partial_{\beta} f(\beta) &= -2 X' (y - \beta X) = 0\\
+&\implies \\
+\beta &= (X'X)^{-1} X' y
+\end{align}
+Don't forget to repeat this yourself; it's more difficult than you might think.
+
+** Very import remarks
+
+- Check the dimensions: $X \sim n\times p$, $y \sim n$, $\beta \sim p$, $X'X \sim p \times p$.
+- Do /not/ compute $(X'X)^{-1}$
+
+Why not invert a matrix to solve $A x = b$, even if $A$ is invertible?
+- Solving $A x = b$ is $O(n^{2})$ algorithmic complexity, solving $A^{-1}$ is $O(n^{3})$.
+- The computation of $A^{-1}$ can be numerically unstable.
+- Even when $A$ is sparse, $A^{-1}$ can be dense. You can go from an $O(n)$ size matrix to an $O(n^{2})$ size matrix. The former can fit in memory, the other not.
+- See [[https://www.johndcook.com/blog/2010/01/19/dont-invert-that-matrix/]]
+
+** Cast in the form $Ax = b$
+So, let's not solve $\beta = (X' X)^{-1} X' y$, but rewrite what we want in the form of $Ax=b$. Take
+\begin{align}
+\label{eq:2}
+A &= X' X, & x &=\beta &  b&= X' y \\
+\end{align}
+With this, solve for $\beta$ in the system
+\begin{equation}
+\label{eq:5}
+Ax = b  \iff X' X \beta = X' y.
+\end{equation}
+
+** Implementation, load standard libs
+
+
+#+begin_src python :session :results none :exports both
+import numpy as np
+from numpy.linalg import solve
+import matplotlib.pyplot as plt
+import pandas as pd
+#+end_src
+
+** Implementation, load data and solve for $\beta$.
+
+Let's do some analysis on song popularity on spotify. I downloaded this data set: [[https://www.kaggle.com/yamaerenay/spotify-dataset-19212020-160k-tracks]].
+
+#+begin_src python :session :results output :exports both
+df = pd.read_csv("data_by_year_o.csv")
+# print(df.head())  # use this to get an idea of  data
+
+X = df[["tempo"]].values
+Y = df["popularity"].values
+
+beta = solve(X.T @ X, X.T @ Y)
+print(beta)
+#+end_src
+
+#+RESULTS:
+: [0.24267508]
+
+Don't build this  ~solve~ function yourself.
+
+Remark. If you want to read multiple columns into $X$, you need a list, like this:
+#+begin_src python :results none :exports code
+X = df[["tempo", "year"]].values
+
+# the following gives an error
+# X = df["tempo", "year"].values
+#+end_src
+For $Y$ I need just one column, hence I don't need a list around "popularity".
+
+
+** Implementation: make plot
+
+#+begin_src python :session :results none :exports both
+y = X @ beta
+
+plt.clf()
+plt.scatter(X, Y)
+plt.plot(X, y)
+# plt.show()
+fname = "figures/fig_1.png"
+plt.savefig(fname)
+#+end_src
+
+
+#+begin_src python :session :results file :exports results
+fname
+#+end_src
+
+#+RESULTS:
+[[file:figures/fig_1.png]]
+
+This is bad, why? We did not include an intercept $\beta_0$.
+
+
+** Regression with a constant
+I found the following extension on the internet on including a constant $\beta_0$. Let's follow it.
+Minimize, for $\beta_0,  \beta$:
+\begin{equation}
+f(\beta_{0}, \beta) = || y - \beta_{0} 1 - X \beta ||^{2},
+\end{equation}
+here $1\sim n\times 1$.
+
+Take  derivatives wrt  $\beta_{0}, \beta$:
+\begin{align}
+\label{eq:1}
+\partial_{\beta_{0}} f &= -2\, 1' (y - \beta_{0}1 - X \beta)  = 0, \\
+\partial_{\beta} f &= -2 X' (y - \beta_{0} 1 - X \beta)  = 0.
+\end{align}
+
+** How not to turning it into $A x= b$
+We can turn the above system into the form $A x = b$ with a bit of work.
+\begin{align}
+\label{eq:1}
+1'(y - \beta_{0}1 - X\beta) &=0 \implies \beta_{0} + 1' X \beta = 1' y, \\
+X'(y - \beta_{0} 1 - X\beta) &= 0 \implies X' 1 \beta_{0} + X' X \beta = X' y.
+\end{align}
+Clearly, the RHSs can be seen as  a stack of $(1' y, X' y)$. With this take:
+\begin{align}
+\label{eq:3}
+A &=
+\begin{pmatrix}
+1 & 1'X \\
+X' 1 & X' X
+\end{pmatrix},
+& x &=
+\begin{pmatrix}
+\beta_{0} \\
+\beta
+\end{pmatrix},
+& b &=
+\begin{pmatrix}
+1' y \\
+X' y
+\end{pmatrix},
+\end{align}
+In my first derivation I was sloppy and did not explicitly include the $1'$ and $1$. This caused me quite some trouble.
+
+** The right way to turn it into $A x= b$
+
+Here is a better way.
+- Augment $X$ with a column of $1$'s, i.e., $[1, X]$, where $1$ is a vector of size $n$.
+- With this new matrix, which we also call $X$, we get the results of the previous slide.
+- We write  $\beta$ for $(\beta_{0}, \beta)$ combined. (I don't like to introduce new notation when the concepts remain the same.)n
+
+** Implementation, compute $\beta_{0}, \beta$
+
+#+begin_src python :session :results output :exports both
+xx = X  # keep for plotting
+X = np.c_[np.ones(len(Y)), X] # put 1 in front
+
+beta = solve(X.T @ X, X.T @ Y)
+print(beta)
+#+end_src
+
+** Implementation: make plot
+
+#+begin_src python :session :results output :exports both
+y = X @ beta
+
+plt.clf()
+plt.scatter(xx, Y)
+plt.plot(xx, y, "r")
+# plt.show()
+fname = "figures/fig_2.png"
+plt.savefig(fname)
+#+end_src
+
+
+#+begin_src python :session :results file :exports results
+fname
+#+end_src
+
+#+RESULTS:
+[[file:figures/fig_1.png]]
+
+Popularity of a song seems to increase with tempo.
+
+* General advice on coding
+** Good Coding:
+- Try to avoid writing functions with side effects. Or, if it does, be very clear about it.
+- Develop test suites. Reread above: The larger benefit of test suites', and let it sink it, and do it.
+
+
+** Good debugging:
+- Learn to read the standard docs on the internet
+- Learn to read error messages! Spend time to understand the errors you get.
