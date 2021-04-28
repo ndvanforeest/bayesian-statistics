@@ -96,6 +96,7 @@ Here are some topics that you might find interesting. They may serve as inspirat
 - [[https://machinelearningmastery.com/random-forest-for-time-series-forecasting/]]
 - [[https://machinelearningmastery.com/predicting-car-insurance-payout/]]
 - https://medium.com/python-in-plain-english/building-a-smart-central-heating-system-with-a-raspberry-pi-and-python-403c6ea0fd7e
+- [[https://www.genengnews.com/news/researchers-develop-biomarker-blood-test-for-depression-bipolar-disorder/]]
 
 * On line Data
 

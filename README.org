@@ -1,7 +1,7 @@
 #+TITLE: Bayesian Statistics
 
 
-- [[course_overview.org][course overview]]: Organization of the course Queueing Theory and Simulation.
+- [[course_overview.org][c2ourse overview]]: Organization of the course Queueing Theory and Simulation.
 - ~slides~: lecture slides and pdf
 
 Comments are more than welcome of course: =n.d.van.foreest@rug.nl=.

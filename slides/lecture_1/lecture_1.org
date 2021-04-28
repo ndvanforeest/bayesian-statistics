@@ -427,3 +427,12 @@ Popularity of a song seems to increase with tempo.
 ** Good debugging:
 - Learn to read the standard docs on the internet
 - Learn to read error messages! Spend time to understand the errors you get.
+
+
+* Handy tools;Exercises
+ Read/Browse the web/documentation of the following topics (Just spend a few minutes so that you see what's it about.)
+ - pytest, and ~UnitTest~, to get the logic of automatic testing, and how such tools can help you.
+ - numpy and scipy, to see what numerical tools are supported out of the box by python.
+ - literature programming, to get an idea how documentation (LaTeX) and code can be merged into one document, and that you know what `tangling' is.
+ - Jupyter as a tool for literate programming. You can also use this for R, and other scripting languages. (I use orgmode, a kind of package of emacs. This surpasses jupyter in ease and power. But it's  not for all people, in particular not those who want to learn power tools.)
+ - Learn how to use ~pip~ to install python libraries (extremely simple).
