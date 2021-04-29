@@ -7,8 +7,8 @@
 #+STARTUP: overview
 #+OPTIONS:  toc:1 H:2
 
-#+include: ../preamble_presentation.org
-# +include: ../preamble_handout.org
+# +include: ../preamble_presentation.org
+#+include: ../preamble_handout.org
 
 
 * Configuration for lecture                                        :noexport:
@@ -569,7 +569,7 @@ Hint, we map a point in $\R^2$ to $\{1, 2\}$, i.e., the two labels red and blue.
 
 * Exercises
 
+  The exercises are not hard, but your programming skills will improve.
+
 - Implement a Gaussian kernel, see DSML section 4.4, for the 1D case and compare with the kernel we used here. Use the code of DSML.4.4 as inspiration.
 - Extend the NW estimator to tackle 2d regression (or classification) problems.
-
-  These exercises are not hard, but your programming skills will improve.
