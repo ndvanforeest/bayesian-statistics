@@ -11,6 +11,7 @@ auto/
 *.png
 *.pdf
 *.rel
+*.tex
 *.toc
 *.pytxcode
 _minted*/

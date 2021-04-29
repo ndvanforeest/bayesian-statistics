@@ -7,8 +7,8 @@
 #+STARTUP: overview
 #+OPTIONS:  toc:1 H:2
 
-# +include: ../preamble_presentation.org
-#+include: ../preamble_handout.org
+# +include: preamble_presentation.org
+#+include: preamble_handout.org
 
 
 * Configuration for lecture                                        :noexport:

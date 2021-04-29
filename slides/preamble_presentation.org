@@ -1,0 +1,8 @@
+#+LATEX_CLASS_OPTIONS: [12pt]
+
+#+LATEX_HEADER: \usepackage[a5paper,landscape]{geometry}
+#+LATEX_HEADER: \usepackage{titlesec}
+#+LATEX_HEADER: \newcommand{\sectionbreak}{\clearpage}
+#+LATEX_HEADER: \newcommand{\subsectionbreak}{\clearpage}
+
+#+include: preamble_shared.org

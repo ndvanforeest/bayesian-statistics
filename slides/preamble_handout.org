@@ -1,0 +1,4 @@
+#+LATEX_CLASS_OPTIONS: [11pt]
+#+LATEX_HEADER: \usepackage{a4wide}
+
+#+include: preamble_shared.org
