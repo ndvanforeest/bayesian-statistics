@@ -372,8 +372,9 @@ import matplotlib.pyplot as plt
 ** A common API
 
 Below I'll build several predictors: OLS, ridge, lasso.
-These predictors have some common functionality, which I therefore put in a base class.
-In particular, I want the predictors to have a similar interface, called an API (Application programming interface).
+These predictors have some common functionality, which I therefore put in a base class. In particular, I want the predictors to have a similar interface, called an API (Application programming interface). Why is this a good idea? Well, in the first place, it becomes possible to reuse things we learned. We have to learn once to call ~solve~, and then it works the same for the rest. Second, we can test the method of a parrent class separately. If it works, it will also work for all the derived classes. Hence, we gain in softwae reliablity. We only have to ensure to do it right once. In python this is called the /DRY/ concept: Don't Repeat Yourself. Applying this concept makes you a much better programmer. Third , it makes it easier to replace one type of regressor by another. They all interact in the same way with `the rest of the world'.
+
+
 I'll derive a class for OLS, ridge regression and Lasso from the ~Preditor~ class.
 
 #+begin_src python :session :results none :exports code
@@ -384,11 +385,18 @@ class Predictor:
         self.gamma = gamma
         self.beta_0 = 0
 
+    def loss(self, X, Y, beta):
+        raise NotImplemented
+
     def solve(self):
         raise NotImplemented
 
     def predict(self, x):
         return self.beta_0 + self.beta @ x
+
+    def mse(self, X, Y):
+        n, p = X.shape
+        return self.loss(X, Y, self.beta).value / n
 #+end_src
 The ~solve~ method has to be implemented in the derived class.
 
@@ -397,9 +405,11 @@ With the ~Predictor~ class, the implemention of an ~OLS~ class is very short. I 
 
 #+begin_src python :session :results none :exports code
 class OLS(Predictor):
+    def loss(self, X, Y, beta):
+        return np.square(Y - beta @ X).sum()
+
     def solve(self):
         self.beta = LA.solve(self.X.T @ self.X, self.X.T @ self.Y)
-
 #+end_src
 
 Thus, I use the regular way to solve an OLS.
@@ -410,13 +420,16 @@ I  also want to build an OLS as a convex optimization problem, and then I let ~C
 
 #+begin_src python :session :results none :exports code
 class OLS_convex(Predictor):
-    def objective(self, X, Y, beta):
+    def loss(self, X, Y, beta):
         return cp.sum_squares(Y - X @ beta)
+
+    def objective(self, beta):
+        return self.loss(self.X, self.Y, beta)
 
     def solve(self):
         n, p = self.X.shape
         beta = cp.Variable(p)
-        obj = cp.Minimize(self.objective(self.X, self.Y, beta))
+        obj = cp.Minimize(self.objective(beta))
         problem = cp.Problem(obj)
         problem.solve()
         self.beta = np.array(beta.value)
@@ -427,9 +440,9 @@ I include an ~objective~ method, because the rigde and lasso regressors will fol
 ** A test
 
 Since classes definitions themselves are also objects, we can pass them to test functions, such as I do below.
-(Here is subtle point, a class definition is not the same as an /instantion/ of a class.
-An instantiation of a class is an object with real data in it while a class is a template that specifies how the objects should behave.
-A class definition is also an object in python, but /not/ an instantiation of the class.)
+(Here is a subtle point. A class is a type, and not the same as an instance or object of a class. An instance of a class holds actual data within it, whereas a type is merely a template that specifies how its instances should behave. When we write ~x = Foo()~, we say ~x~ is an object or instance of type ~Foo~.
+
+To add to the confusion, ~Foo~ is both a type and an object. That is because ~Foo~ is an instance of the type ~type~ - but not of type ~Foo~. Understanding the distinction between objects and types is paramount in furthering your programming skills. I admit, it takes some time to understand, but once you do, you will write better code, with less mistakes, and you can yet more adhere to the DRY concept.)
 
 #+begin_src python :session :results none :exports code
 def test(method):
@@ -474,11 +487,15 @@ If you have read the relevant parts,  the code below is evident.
 
 #+begin_src python :session :results none  :exports code
 class Ridge(Predictor):
+    def loss(self, X, Y, beta):
+        return np.square(Y - beta @ X).sum()
+
     def solve(self):
         n, p = self.X.shape
         A = self.X.T @ self.X + self.gamma * np.eye(p)
         b = self.X.T @ self.Y
         self.beta = LA.solve(A, b)
+
 #+end_src
 
 ** Ridge regression with CVXPY
@@ -493,17 +510,13 @@ class Ridge_convex(Predictor):
     def regularizer(self, beta):
         return cp.pnorm(beta, p=2) ** 2
 
-    def objective(self, X, Y, beta):
-        return self.loss(X, Y, beta) + self.gamma * self.regularizer(beta)
-
-    def mse(self, X, Y):
-        n, p = self.X.shape
-        return self.loss(X, Y, self.beta).value / n
+    def objective(self, beta):
+        return self.loss(self.X, self.Y, beta) + self.gamma * self.regularizer(beta)
 
     def solve(self):
         n, p = self.X.shape
         beta = cp.Variable(p)
-        obj = cp.Minimize(self.objective(self.X, self.Y, beta))
+        obj = cp.Minimize(self.objective(beta))
         problem = cp.Problem(obj)
         problem.solve(solver="SCS")
         self.beta = np.array(beta.value)
@@ -622,19 +635,20 @@ class Ridge_with_constant(Predictor):
 
 * Lasso regession
 
-There is not direct method to find the minimum in the objective for lasso; we have to use a tool like CVXPY. I borrowed some ideas from [[https://www.cvxpy.org/examples/machine_learning/lasso_regression.html][cvxpy.lasso]]. However, given the classes I already built above, there is not much work to do. In fact, the three lines below is all!
+There is not direct method to find the minimum in the objective for lasso; we have to use a tool like CVXPY. I borrowed some ideas from [[https://www.cvxpy.org/examples/machine_learning/lasso_regression.html][cvxpy.lasso]].
 
-A piece of advice: think hard about how I organized the code, and compare my code with that of the ~CVXPY~ site.  Hopefully you can see how much work I have been able to suppress by defining good classes.
+** Implementation
 
-** The class implementation
+Given the classes I already built above, there is not much work to do. In fact, the three lines below is all!
 
-#+begin_src python
+
+#+begin_src python :session :results none  :exports code
 class Lasso(Ridge_convex):
     def regularizer(self, beta):
         return cp.norm1(beta)
 #+end_src
 
-#+RESULTS:
+Here is some  advice: think hard about how I organized the code, and compare my code with that of the ~CVXPY~ site.  Hopefully you can see how much work I have been able to suppress by defining good classes. In more general terms, I applied a concept called /abstraction/. I focussed on  aspects that all predictors have in common. This I put in the ~Predictor~ class. Then I checked what ridge regression and lasso have in common. As it turns out, quite a lot. That is why the implementation of the lasso class is so small: most of the work is covered in ~Ridge_convex~.
 
 ** Graphs
 
@@ -672,15 +686,14 @@ Recall from the ~statistics_plotting()~ function that the first 10 betas were 1 
 ** Technical part
 
 - Ridge regression is a problem that can be solved in the form of $Ax = b$.
-- Lasso requires optimization tools. In general I believe that solving optimization problems is slower than solving $Ax = b$, and perhaps more prone to numerical issues (but I haven't tested this, so it's a matter of belief). Hence, if you don't have compelling reasons to use Lasso, perhaps its better to use ridge regression.
+- Lasso requires optimization tools. In general, solving optimization problems must be  slower than solving $Ax = b$, since the latter is a step that is repeatedly done to solve the former.  Perhaps optimization is also more prone to numerical issues (but I haven't tested this, so it's a matter of belief). Hence, if you don't have compelling reasons to use Lasso, perhaps it's better to use ridge regression.
 
 ** Coding
 
-- Defining a good class hierarchy can save you a lot of typing. Moreover, it helps to understand code much better. Finally, we can reuse lots of code. Hence, we only have to test it once. All classes that derive from a parent class benefit from this.
+- Defining a good class hierarchy---finding a good level of /abstration/---can save you a lot of typing. Moreover, it helps to understand code much better. Finally, we can reuse lots of code. Hence, we only have to test code once. All classes that derive from a parent class benefit from this.
 - Good python librarie share ideas of the  API. For instance, in  ~pulp and ~CVXPY~ we define a problem, and we can call the ~solve~ method for both. Similar names and APIs make code better understandable, and easier to memorize.
-- Avoid (to the extent possible) to learn ten different tools, each with their own quirks, such as  AIMS for LPs, strata (?) for data analysis, yet other tools for convex optimization, and so on.
-- Using many different tools makes you less efficient, and you'll make more mistakes.
-- Realize, later in life you don't get paid to use AIMS (or whatever other tools); you get paid to get a job done. So, any time spent on learning ten different tools is (basically) wasted.
+- Avoid (to the extent possible) to learn ten different tools, each with their own quirks, such as  AIMS for LPs, Stata (?) for data analysis, yet other tools for convex optimization, and so on. Using many different tools makes you less efficient, and you'll make more mistakes.
+- Realize, later in life you don't get paid to use AIMS (or whatever other tools); you get paid to get a job done. So, any time spent on learning ten different tools is (basically) wasted. Your customer will not pay for it, so it's  time of yourself not spent on Sunday picnics.
 
 For me:
 - I prefer to be lazy and let the computer solve my problems.  So, if I have to do something tedious, I often try to develop on an algorithm (an intellecual  challenge) and  pass the execution of the job (very boring and time consuming) to the computer.
@@ -712,7 +725,20 @@ Can you extend the implemention of  lasso to /Fused Lasso/? The objective for fu
 \label{eq:1}
 ||Y-X \beta||_2 + \lambda_1 ||\beta||_1 + \lambda_2 \sum_{i=2}^p |\beta_j-\beta_{j-1}|,
 \end{equation}
-where $||\cdot||_{2}$ is the 2-norm, and $||\cdot||_{1}$ the 1-norm. Look  on Wikipedia is you don't know what I mean by this. It's important to know, as these types of norm are also used by ~CVXPY~.
+where $||\cdot||_{2}$ is the 2-norm, and $||\cdot||_{1}$ the 1-norm. Check out Wikipedia if you don't know what I mean by this. It's important to know, as these types of norm are also used by ~numpy~, ~CVXPY~, and other numerical toolboxes.
+
+I haven't tried this, nor tested it. I have no idea whether this additional regulazation term works or not. In all honesty (and naive no doubt), I don't see much value in such tweaks. Why would one want to regularize the difference between successive terms of $\beta$? Take $\lambda_{1}$ big, then  $||\beta||$ will be small anyway, so $\beta_j-\beta_{j-1}$ must also be small. Second, why would I care about $\beta_{1}$ being big, and $\beta_2$ small?  If this matter, it must say something about the first and second column of $X$. But why would there be any particular order in the features?
+
+As a general rule: in my own experience, tweaks seldom work.
+They are not based on fundamental insights (such as regulation which ridge and lasso already capture).
+Tweaks are mostly (dumb) guess that might work, but just as well might fail.
+As far as I can see, tweaks are not robust solutions to real problems.
+For real, practical problems (problems that are typically extremely hard), simply don't use tweaks.
+However, if you disagree with me, no problem.
+I can be completely wrong here. Nobody knows the answer here :-)
+
+
+
 
 ** Exercise 3
 Redo the lasso problem above with ~sklearn~.
