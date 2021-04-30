@@ -1,0 +1,718 @@
+#+title: Machine Learning: algorithms, Code lecture 3
+#+subtitle: Data reading and regression
+#+author: Nicky van Foreest
+#+date: \today
+
+
+#+STARTUP: overview
+#+OPTIONS:  toc:1 H:2
+
+# +include: preamble_presentation.org
+#+include: preamble_handout.org
+
+
+* Configuration for lecture                                        :noexport:
+
+# +begin_src emacs-lisp
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 4.0))
+(modus-themes-load-operandi)
+(set-face-attribute 'default nil :height 220)
+#+end_src
+
+And config back
+#+begin_src emacs-lisp
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 2.0))
+(modus-themes-load-vivendi)
+(set-face-attribute 'default nil :height 95)
+#+end_src
+
+#+RESULTS:
+
+C-u C-u C-c C-x C-l to preview all
+
+* Overview
+- Last lecture
+  - Examples of bad code, and how to repair
+  - Gradient descent
+  - Kernel methods
+- This lecture focusses on optimization
+  - LP solvers and graphs
+  - ridge regression
+  - lasso
+- Next lecture:
+  - Decision trees
+
+Recall, the goal of this lecture (and set of handouts) is to provide you with working code and explain how the code works.
+
+* LP (PULP) and graphs (networkx)
+
+** Intro and motivation
+ From the theory lectures and DSML you learned that Lasso can only be solved with optimization tools; there are not closed-form solutions to get the $\beta$ directly.
+As a second ingredient you should know that graphs are used to visualize and analyze certains types of data, for instance facebook networks, or genes. Hence, it doesn't hurt for you to see how we can combine optimization and networks to analyze a scheduling problem.
+
+First I will discuss the scheduling problem, then develop the code to analyze it. I find the tools really neat. We will show how to use classes to deal with graphs and optimization problems on a conceptual level. When we come to dicussing lasso, you'll see that there are many common points.
+
+** Needed software
+
+We will need:
+- ~graphviz~ to visualize the project graph
+- ~pulp~, a python library, to solve the LP that results from optimizing the project plan. The API of ~pulp~ is very similar to that of the optimization library (~CVXPY~), which we will use to tackle the optimization problem involved in lasso.
+- ~networkx~, a python library, to handle (very) large graphs.
+
+I installed the software with ~pip~.
+#+begin_src shell :results none :exports code
+pip install networkx
+pip install pulp
+#+end_src
+
+** Projects and critical paths
+
+We have a project with tasks.
+Each task has a duration. Tasks can have predecessor tasks; a predecessor is a task that has be finished before the specific task is allowed to start. (For instance, we have to build the walls before putting the roof on the house.) The problem is to determine the /makespan/: the minimal time to complete the project by taking into account all task durations and predecessor relations.
+
+We implement this as a graph. Each node corresponds to a task, each edge to a duration and a predecessor relation.
+
+Here is an example. (I use the ~graphviz~ libary to plot the graph.) The nodes ~U~ and ~V~ correspond to the start and finish of the project.
+
+#+BEGIN_SRC dot :file figures/test-dot.pdf :exports both
+digraph{
+    rankdir=LR;
+    size="12.3,10.7!";
+   "U" -> "1";
+   "1" -> "2" [ label = "5" ];
+   "2" -> "4" [ label = "6" ];
+   "4" -> "7" [ label = "12" ];
+   "7" -> "10" [ label = "10" ];
+   "10" -> "12" [ label = "9" ];
+   "12" -> "14" [ label = "8" ];
+   "1" -> "3" [ label = "5" ];
+   "3" -> "6" [ label = "9" ];
+   "3" -> "5" [ label = "9" ];
+   "6" -> "9" [ label = "12" ];
+   "6" -> "8" [ label = "12" ];
+   "5" -> "9" [ label = "7" ];
+   "5" -> "8" [ label = "7" ];
+   "9" -> "11" [ label = "10" ];
+   "8" -> "11" [ label = "6" ];
+   "11" -> "12" [ label = "7" ];
+   "11" -> "13" [ label = "7" ];
+   "13" -> "14" [ label = "7" ];
+   "14" -> "V" [ label = "5" ];
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:figures/test-dot.pdf]]
+
+** Implementation in ~networkx~
+
+I'll use the ~networkx~ library to deal with this graph numerically. I also load ~pulp~ here because I'll need that below anyway.
+
+#+name: imports
+#+begin_src python :session :results none :exports both
+import networkx as nx
+import pulp
+#+end_src
+
+Here are the nodes with the task  durations, e.g., node 1 has a duration of 5.
+
+#+begin_src python :session :results none :exports both
+nodes = (
+    (1, 5),
+    (2, 6),
+    (3, 9),
+    (4, 12),
+    (5, 7),
+    (6, 12),
+    (7, 10),
+    (8, 6),
+    (9, 10),
+    (10, 9),
+    (11, 7),
+    (12, 8),
+    (13, 7),
+    (14, 5),
+)
+#+end_src
+
+And the edges.
+
+#+begin_src python :session :results none :exports both
+edges = [
+    (1, 2),
+    (2, 4),
+    (4, 7),
+    (7, 10),
+    (10, 12),
+    (12, 14),
+    (1, 3),
+    (3, 6),
+    (3, 5),
+    (6, 9),
+    (6, 8),
+    (5, 9),
+    (5, 8),
+    (9, 11),
+    (8, 11),
+    (11, 12),
+    (11, 13),
+    (13, 14),
+]
+#+end_src
+
+I add the nodes and edges to a ~DiGraph~, a class of ~networkx~ to implement directed graphs. I add a tag ~p~ to each node to indicate the task duration (processing time).
+
+#+name: cpm
+#+begin_src python :session :results none :exports both
+cpm = nx.DiGraph()
+
+for n, p in nodes:
+    cpm.add_node(n, p=p)
+
+cpm.add_edges_from(edges)
+#+end_src
+
+Finally, I  add a ~Cmax~ node with job duration ~0~ and with all other nodes as its predecessor. When the node ~Cmax~ is finished, the project is finished. Thus, the objective will be to minimize the completion time of ~Cmax~, because that will minimize the makespan of the project.
+
+#+name: cmax
+#+begin_src python :session :results none :exports both
+cpm.add_node("Cmax", p=0)
+cpm.add_edges_from([(j, "Cmax") for j in cpm.nodes()])
+#+end_src
+
+Remark: I built the above by hand. For real projects, such information is stored in a database, and then we use computer programms to build the graphs.
+
+
+** Solving for the makespan
+
+
+Now that we have graph, we want to compute the completion time of ~Cmax~. For this we model the problem as an LP.
+
+We begin with loading ~pulp~, a python library to solve LPs. Then we create a problem, to which we add decision variables, contrainsts, and an objective.
+
+#+name:problem
+#+begin_src python :session :results none :exports both
+prob = pulp.LpProblem("Critical_Path_Problem", pulp.LpMinimize)
+#+end_src
+
+
+As for the  decision variables, each job \(j\) has  a starting time $s_{j}$ and a completion time $c_{j}$, for $j=1,\ldots, n$.
+
+#+name: decisions
+#+begin_src python :session :results none :exports both
+all_nodes = [j for j in cpm.nodes()]
+s = pulp.LpVariable.dicts("s", all_nodes, 0)  # start
+c = pulp.LpVariable.dicts("c", all_nodes, 0)  # completion
+#+end_src
+The $0$ (the last attribute) constrains the variables to non-negative values.
+
+
+Now we implement  the constraints. For each  job $j$, its completion time $c_{j}$ must be larger than its starting time $s_{j}$ plus its  processing time $p_{j}$:
+\begin{equation*}
+   c_j \geq s_j + p_j, \quad \text{for } j=1,\ldots, n.
+\end{equation*}
+
+#+name: own_completion
+#+begin_src python :session :results none :exports both
+for j in cpm.nodes():
+    prob += c[j] >= s[j] + cpm.nodes[j]['p']
+#+end_src
+(Observe that the python code is very similar to the maths.)
+
+Next,  a job can only start after all its predecessors are finished:
+\begin{equation*}
+   s_j  \geq s_i+p_i, \text{ for all } i \to j,
+\end{equation*}
+where we write $i\to j$ to mean that job $i$ precedes job $j$.
+
+#+name: start
+#+begin_src python :session :results none :exports both
+for j in cpm.nodes():
+    for i in cpm. predecessors(j):
+        prob += s[j] >= s[i] + cpm.nodes[i]['p']
+#+end_src
+Observe here we that the ~DiGraph~ class of ~networkx~ provides us with a function to compute the predessorcs. We get it for free!
+
+
+Finally, a job's completion time must be larger than the completion times of each of its predecessors plus its own processing time:
+\begin{equation*}
+   c_j \geq c_i + p_j, \text{ for all } i \to j.
+\end{equation*}
+
+#+name: completion
+#+begin_src python :session :results none :exports both
+for j in cpm.nodes():
+    for i in cpm. predecessors(j):
+        prob += c[j]  >= c[i] + cpm.nodes[j]['p']
+#+end_src
+Observe that the constraint $C_{\max} \geq c_j$ is automaticaly included by these constraints, as `Cmax` is a node in the project graph.
+
+
+The objective function is such that the makespan is minimized and,  simultaneously, that the earliest starting times are minimized and latest completion times are maximized.
+With this we can find the slack of task $j$ as $c_j-s_j - p_{j}$. Knowing the slack is important: any job with zero slack is /tight/, which means that it's on the /critical path/. Any detail on a tight job will result in a delay of the entire project. Hence, it's essential to manage the tight jobs well, so as to prevent delay.
+
+We thereforex define the objective function as
+\begin{align*}
+   \min\left\{ C_{max} + \epsilon \sum_{j=1}^n s_j - \epsilon \sum_{j=1}^n c_j \right\},
+\end{align*}
+where $\epsilon$ is some small number, and $n$ is the number of tasks.
+
+#+name: objective
+#+begin_src python :session :results none :exports both
+eps = 1e-5
+prob += (
+    c["Cmax"]
+    + eps * pulp.lpSum([s[j] for j in cpm.nodes()])
+    - eps * pulp.lpSum([c[j] for j in cpm.nodes()])
+)
+#+end_src
+
+Solving is now very simple. We can just call ~solve~ to have the LP built, and solved.
+
+#+name: solve
+#+begin_src python :session :results none :exports both
+prob.writeLP("cpmLP.lp")
+prob.solve()
+pulp.LpStatus[prob.status]
+#+end_src
+
+Let's check the status:
+#+begin_src python :session :results value :exports both
+pulp.LpStatus[prob.status]
+#+end_src
+
+#+RESULTS:
+: Optimal
+
+This is good news: the problem is solved to optimality.
+
+Here are the earliest starting, completion times, and slacks. All jobs that have zero slack are in the critical path.
+
+
+#+begin_src python :session :results output :exports both
+for j in cpm.nodes():
+    print(
+        j, s[j].varValue, c[j].varValue, c[j].varValue - s[j].varValue - cpm.nodes[j]['p']
+    )
+#+end_src
+
+#+RESULTS:
+#+begin_example
+1 0.0 5.0 0.0
+2 5.0 12.0 1.0
+3 5.0 14.0 0.0
+4 11.0 24.0 1.0
+5 14.0 26.0 5.0
+6 14.0 26.0 0.0
+7 23.0 34.0 1.0
+8 26.0 36.0 4.0
+9 26.0 36.0 0.0
+10 33.0 43.0 1.0
+11 36.0 43.0 0.0
+12 43.0 51.0 0.0
+13 43.0 51.0 1.0
+14 51.0 56.0 0.0
+Cmax 56.0 56.0 0.0
+#+end_example
+
+The project completion time is $56$ time units.
+
+** Summary
+Observe how ~networks~ helps us to model and solve this scheduling problem on conceptual level. We have to do astonishingly little ourselves, we can fully concentrate on getting the model correct and on the solution itself, and we don't have to be concerned with any  tough (numerical) algorithm.
+
+To show you how little real code we actually need, here is what I would normally program. Actually, as for me, there is no need for much documentation, as the code tells me what is going on.
+#+begin_src python :noweb yes :exports code
+<<imports>>
+
+<<cpm>>
+
+<<cmax>>
+
+<<problem>>
+
+<<decisions>>
+
+<<own_completion>>
+
+<<start>>
+
+<<completion>>
+
+<<objective>>
+
+<<solve>>
+#+end_src
+
+#+RESULTS:
+
+Of course I need code to enter the data, such as the nodes, task durations and predecessors, and I need code to process the results. These parts of the code can be pretty big at times, BTW. However, as you can see, the engine itself is very short and conceptually clear.
+
+
+* OLS
+
+Now I want to demonstrate how to solve OLS with the optimization library ~CVXPY~. I don't want to use ~sklearn~ directly, although that would be natural since we are dealing with a data analysis problem. However,  ~CVXPY~ is a generic tool, a tool we  can use for many other optimization tools, such as portfolio optimazation, inventory control, and so on. So, we learn one tool, but get lots of offspin.
+
+Below I will use  ~CVXPY~ to deal with lasso, but before trying such a tool on new problems, I prefer to see how it works  on I can check. Hence, let's tackle OLS first.
+
+
+Installing ~CVXPY~  took a bit of time (a few minutes) as apparently lots of stuff had to be compiled. Again I use ~pip~ for this.
+
+#+begin_src shell :results none :exports code
+pip install cvxpy
+#+end_src
+
+** Imports
+#+begin_src python :session :results none :exports code
+import numpy as np
+from numpy import linalg as LA
+import cvxpy as cp
+import matplotlib.pyplot as plt
+#+end_src
+
+** A common API
+
+Below I'll build several predictors: OLS, ridge, lasso.
+These predictors have some common functionality, which I therefore put in a base class.
+In particular, I want the predictors to have a similar interface, called an API (Application programming interface).
+I'll derive a class for OLS, ridge regression and Lasso from the ~Preditor~ class.
+
+#+begin_src python :session :results none :exports code
+class Predictor:
+    def __init__(self, X, Y, gamma=0):
+        self.X = X
+        self.Y = Y
+        self.gamma = gamma
+        self.beta_0 = 0
+
+    def solve(self):
+        raise NotImplemented
+
+    def predict(self, x):
+        return self.beta_0 + self.beta @ x
+#+end_src
+The ~solve~ method has to be implemented in the derived class.
+
+** Regular OLS
+With the ~Predictor~ class, the implemention of an ~OLS~ class is very short. I just have to build the ~solve~ method; the rest can be inherited.
+
+#+begin_src python :session :results none :exports code
+class OLS(Predictor):
+    def solve(self):
+        self.beta = LA.solve(self.X.T @ self.X, self.X.T @ self.Y)
+
+#+end_src
+
+Thus, I use the regular way to solve an OLS.
+
+** OlS with CVXPY
+
+I  also want to build an OLS as a convex optimization problem, and then I let ~CVXPY~ solve it. (I modified the code I found  [[https://www.cvxpy.org/examples/basic/least_squares.html][here]].)
+
+#+begin_src python :session :results none :exports code
+class OLS_convex(Predictor):
+    def objective(self, X, Y, beta):
+        return cp.sum_squares(Y - X @ beta)
+
+    def solve(self):
+        n, p = self.X.shape
+        beta = cp.Variable(p)
+        obj = cp.Minimize(self.objective(self.X, self.Y, beta))
+        problem = cp.Problem(obj)
+        problem.solve()
+        self.beta = np.array(beta.value)
+#+end_src
+
+I include an ~objective~ method, because the rigde and lasso regressors will follow the same pattern. Again, note that it suffices to build a ~solve~ method.
+
+** A test
+
+Since classes definitions themselves are also objects, we can pass them to test functions, such as I do below.
+(Here is subtle point, a class definition is not the same as an /instantion/ of a class.
+An instantiation of a class is an object with real data in it while a class is a template that specifies how the objects should behave.
+A class definition is also an object in python, but /not/ an instantiation of the class.)
+
+#+begin_src python :session :results none :exports code
+def test(method):
+    np.random.seed(3)
+
+    n, p = 50, 20
+    sigma = 5
+
+    beta_star = np.ones(p)
+    beta_star[:10] = np.zeros(10)
+
+    X = np.random.randn(n, p)
+    Y = X @ beta_star + np.random.normal(0, sigma, size=n)
+
+    algo = method(X, Y, gamma=1)
+    algo.solve()
+    print(algo.beta[0])
+#+end_src
+
+
+#+begin_src python :session :results output :exports both
+test(OLS)
+test(OLS_convex)
+#+end_src
+
+#+RESULTS:
+: 0.7362515517803382
+: 0.7362515517803384
+
+
+Note that I compare  my `new' tool ~CVXPY~ against my `old' tool ~numpy.linalg.solve~.
+Perhaps you find me a bit over cautious, but from experience I can tell you that if you forget (or are too lazy) to do such steps, you can be confronted with very awkward surprises.
+Such intermediate checks help to locate mistakes that I might make later.
+In case errors occur later, it's unlikely I have to search for the problem in the points above.
+
+
+* Ridge regression
+
+** Regular Ridge regression
+I first build rigde regression as explained in DSML.6.2; this method is  direct, i.e., it solves a problem of the form $A x = b$.
+If you have read the relevant parts,  the code below is evident.
+
+#+begin_src python :session :results none  :exports code
+class Ridge(Predictor):
+    def solve(self):
+        n, p = self.X.shape
+        A = self.X.T @ self.X + self.gamma * np.eye(p)
+        b = self.X.T @ self.Y
+        self.beta = LA.solve(A, b)
+#+end_src
+
+** Ridge regression with CVXPY
+
+I adapted the code I found here: [[https://www.cvxpy.org/examples/machine_learning/ridge_regression.html][cvxpy ridge]]. Just read the code, it is self explanatory.
+
+#+begin_src python :session :results none  :exports code
+class Ridge_convex(Predictor):
+    def loss(self, X, Y, beta):
+        return cp.pnorm(X @ beta - Y, p=2) ** 2
+
+    def regularizer(self, beta):
+        return cp.pnorm(beta, p=2) ** 2
+
+    def objective(self, X, Y, beta):
+        return self.loss(X, Y, beta) + self.gamma * self.regularizer(beta)
+
+    def mse(self, X, Y):
+        n, p = self.X.shape
+        return self.loss(X, Y, self.beta).value / n
+
+    def solve(self):
+        n, p = self.X.shape
+        beta = cp.Variable(p)
+        obj = cp.Minimize(self.objective(self.X, self.Y, beta))
+        problem = cp.Problem(obj)
+        problem.solve(solver="SCS")
+        self.beta = np.array(beta.value)
+#+end_src
+I got some warnings with the standard solver ~ECOS~. A search on ~cvxpy warning~ helped me resolve this.
+
+
+** A test
+
+I can use the earlier test function right away.
+#+begin_src python :session :results output  :exports both
+test(Ridge)
+test(Ridge_convex)
+#+end_src
+
+#+RESULTS:
+: 0.6839570416892673
+: 0.6837994245619745
+
+** Graphs
+
+Finally we make a graph of how the mse and betas vary as  function of the regulation cost $\gamma$.
+
+#+begin_src python :session :results none  :exports code :cache yes
+def statistics_plotting(method):
+    n, p = 100, 20
+    sigma = 5
+
+    beta_star = np.ones(p)
+    beta_star[10:] = 0
+
+    np.random.seed(3)
+    X = np.random.randn(n, p)
+    Y = X @ beta_star + np.random.normal(0, sigma, size=n)
+
+    X_train, Y_train = X[:50, :], Y[:50]
+    X_test, Y_test = X[50:, :], Y[50:]
+
+    gamma_values = np.logspace(-2, 3, 50)
+    train_errors, test_errors, beta_values = [], [], []
+    for g in gamma_values:
+        algo = method(X_train, Y_train, gamma=g)
+        algo.solve()
+        train_errors.append(algo.mse(X_train, Y_train))
+        test_errors.append(algo.mse(X_test, Y_test))
+        beta_values.append(algo.beta)
+    # print(train_errors)
+
+    plt.clf()
+    plt.plot(gamma_values, train_errors, label="Train error")
+    plt.plot(gamma_values, test_errors, label="Test error")
+    plt.xscale("log")
+    plt.legend(loc="upper left")
+    plt.xlabel(r"$\gamma$", fontsize=16)
+    plt.title("Mean Squared Error (MSE)")
+    fname = "figures/" + algo.__class__.__name__ + "_mse.pdf"
+    plt.savefig(fname)
+
+    plt.clf()
+    num_coeffs = len(beta_values[0])
+    for i in range(num_coeffs):
+        plt.plot(gamma_values, [wi[i] for wi in beta_values])
+
+    plt.xlabel(r"$\gamma$", fontsize=16)
+    plt.xscale("log")
+    plt.title("Regularization Path")
+    fname = "figures/" + algo.__class__.__name__ + "_betas.pdf"
+    plt.savefig(fname)
+
+
+statistics_plotting(Ridge_convex)
+#+end_src
+
+
+
+#+begin_src python :session :results file :exports results
+"figures/Ridge_convex_mse.pdf"
+#+end_src
+
+#+RESULTS:
+[[file:figures/Ridge_convex_mse.pdf]]
+
+Since you like econometrics, explain this graph!
+
+
+And a plot of how the sizes of $\beta$ vary as a function of $\gamma.
+
+#+begin_src python :session :results file :exports results
+"figures/Ridge_convex_betas.pdf"
+#+end_src
+
+#+RESULTS:
+[[file:figures/Ridge_convex_betas.pdf]]
+
+** Ridge regression without penalizing the constant
+
+When we don't want to include a penalty on the constant $\beta_{0}$ the construction of the matrices is a bit harder. Here is the code. Read it so that you understand how to tackle the matrix multiplications.
+
+Observe again that I do not include the $n$ term with the constant $\gamma$.
+Also, the ~dum~ stores the vector $1' X$ to save time in the other computations.
+
+#+begin_src python :session :results none  :exports both
+class Ridge_with_constant(Predictor):
+
+    def solve(self):
+        n, p = self.X.shape
+        A = self.X.T @ self.X
+        dum = np.ones((1, n)) @ self.X
+        A -= dum.T @ dum / n
+        A += self.gamma * np.eye(p)
+        b = (self.X.T - dum.T @ np.ones((1, n)) / n) @ self.Y
+        self.beta = solve(A, b)
+        self.beta_0 = np.ones((1, n)) @ (self.Y - dum @ beta)
+#+end_src
+
+
+* Lasso regession
+
+There is not direct method to find the minimum in the objective for lasso; we have to use a tool like CVXPY. I borrowed some ideas from [[https://www.cvxpy.org/examples/machine_learning/lasso_regression.html][cvxpy.lasso]]. However, given the classes I already built above, there is not much work to do. In fact, the three lines below is all!
+
+A piece of advice: think hard about how I organized the code, and compare my code with that of the ~CVXPY~ site.  Hopefully you can see how much work I have been able to suppress by defining good classes.
+
+** The class implementation
+
+#+begin_src python
+class Lasso(Ridge_convex):
+    def regularizer(self, beta):
+        return cp.norm1(beta)
+#+end_src
+
+#+RESULTS:
+
+** Graphs
+
+Making graphs of the mse and the betas comes down to calling one of the above functions. That's all there is left!
+
+#+begin_src python :session :results none  :exports code :cache yes
+statistics_plotting(Ridge_convex)
+#+end_src
+
+
+
+#+begin_src python :session :results file :exports results
+"figures/Lasso_mse.pdf"
+#+end_src
+
+#+RESULTS:
+[[file:figures/Ridge_convex_mse.pdf]]
+
+Since you like econometrics, explain this graph!
+
+
+And a plot of how the sizes of $\beta$ vary as a function of $\gamma.
+
+#+begin_src python :session :results file :exports results
+"figures/Lasso_betas.pdf"
+#+end_src
+
+#+RESULTS:
+[[file:figures/Lasso_betas.pdf]]
+
+Recall from the ~statistics_plotting()~ function that the first 10 betas were 1 and the rest zero, i.e, $\beta_{i} = 1$ for $i<10$, and $\beta_i=0$ for $i=10,\ldots, p-1$. I have to admit that I am not particularly impressed by the selection of lasso. The test MSE achieves its minimum around $\gamma=100$. But I have a hard time to learn from the regularization paths what the best $\gamma$ should be.  Perhaps I made a mistake somewhere; if so, let me know.
+
+* General advice
+
+** Technical part
+
+- Ridge regression is a problem that can be solved in the form of $Ax = b$.
+- Lasso requires optimization tools. In general I believe that solving optimization problems is slower than solving $Ax = b$, and perhaps more prone to numerical issues (but I haven't tested this, so it's a matter of belief). Hence, if you don't have compelling reasons to use Lasso, perhaps its better to use ridge regression.
+
+** Coding
+
+- Defining a good class hierarchy can save you a lot of typing. Moreover, it helps to understand code much better. Finally, we can reuse lots of code. Hence, we only have to test it once. All classes that derive from a parent class benefit from this.
+- Good python librarie share ideas of the  API. For instance, in  ~pulp and ~CVXPY~ we define a problem, and we can call the ~solve~ method for both. Similar names and APIs make code better understandable, and easier to memorize.
+- Avoid (to the extent possible) to learn ten different tools, each with their own quirks, such as  AIMS for LPs, strata (?) for data analysis, yet other tools for convex optimization, and so on.
+- Using many different tools makes you less efficient, and you'll make more mistakes.
+- Realize, later in life you don't get paid to use AIMS (or whatever other tools); you get paid to get a job done. So, any time spent on learning ten different tools is (basically) wasted.
+
+For me:
+- I prefer to be lazy and let the computer solve my problems.  So, if I have to do something tedious, I often try to develop on an algorithm (an intellecual  challenge) and  pass the execution of the job (very boring and time consuming) to the computer.
+- However,  in general I find most (nearly all?) computer tools extremely boring, so the less time I  have to invest in learning such things, the better. In other terms, I am not a computer scientist or programmer;  I am not interested in seeing how  ten different computer tools work. I find it boring, and prefer to spend my time on other things.
+
+Best advice: Do as I do :-)
+
+
+
+
+* Exercises
+
+** Exercise 1
+Read/Browse the web/documentation of the following topics (Just spend a few minutes so that you see what's it about.)
+  - [[https://networkx.org/][~networks~]]
+  - https://graphviz.org/ to visualize (huge) graphs
+  - [[https://programminghistorian.org/en/lessons/exploring-and-analyzing-network-data-with-python][~networkx and data analysis~]]
+  - [[https://towardsdatascience.com/getting-started-with-graph-analysis-in-python-with-pandas-and-networkx-5e2d2f82f18e][~networkx and pandas~]]
+  - Understand why and when to use classes, for instance [[https://towardsdatascience.com/how-to-use-python-classes-effectively-10b42db8d7bd][here]].
+  - ~pulp~, Setting up LPs; search for `gurobi and python' for the best LP solvers.
+  - https://www.cvxpy.org/. Check the many examples.
+  - https://osqp.org/docs/solver/index.html. This is another solver. Perhaps useful. For instance, they  provide an example on portfolio optimization.
+  - https://xavierbourretsicotte.github.io/ridge_lasso_visual.html
+
+** Exercise 2
+
+Can you extend the implemention of  lasso to /Fused Lasso/? The objective for fused lasso is this:
+\begin{equation}
+\label{eq:1}
+||Y-X \beta||_2 + \lambda_1 ||\beta||_1 + \lambda_2 \sum_{i=2}^p |\beta_j-\beta_{j-1}|,
+\end{equation}
+where $||\cdot||_{2}$ is the 2-norm, and $||\cdot||_{1}$ the 1-norm. Look  on Wikipedia is you don't know what I mean by this. It's important to know, as these types of norm are also used by ~CVXPY~.
+
+** Exercise 3
+Redo the lasso problem above with ~sklearn~.
