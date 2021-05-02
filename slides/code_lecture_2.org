@@ -164,6 +164,7 @@ def get_exam_grade():
 
 ** Motivation
 - General technique, intuitive
+- We will use it when we deal with /boosting/.
 - The convex optimization tools we are going to use for LASSO use similar (but much better) ideas.
 - Deep learning uses similar ideas to train neural networks
 - A good recap of a topic you learned in  Multi Variate Calculus!

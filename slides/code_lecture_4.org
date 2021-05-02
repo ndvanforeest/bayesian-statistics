@@ -1,0 +1,380 @@
+#+title: Machine Learning: algorithms, Code Lecture 4
+#+subtitle: Trees
+#+author: Nicky van Foreest
+#+date: \today
+
+
+#+STARTUP: overview
+#+OPTIONS:  toc:1 H:2
+
+# +include: preamble_presentation.org
+#+include: preamble_handout.org
+
+
+* Configuration for lecture                                        :noexport:
+
+# +begin_src emacs-lisp
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 4.0))
+(modus-themes-load-operandi)
+(set-face-attribute 'default nil :height 220)
+#+end_src
+
+And config back
+#+begin_src emacs-lisp
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 2.0))
+(modus-themes-load-vivendi)
+(set-face-attribute 'default nil :height 95)
+#+end_src
+
+C-u C-u C-c C-x C-l to preview all
+
+* Overview
+- Last lecture
+  - LP solvers and graphs
+  - ridge
+  - lasso
+- This lecture
+  - Decision Trees
+- Next lecture:
+
+Recall, the goal is to provide you with working code and explain how the code works.
+
+* Recursion
+Recursion is an important idea in the design of computer algorithms. Here I discuss two, to help you get in the mood. Then I'll apply it to make decision trees.
+** Quicksort
+The goal is to explain how recursion is used in sorting. Don't implement this, as we do not cope with many corner cases.
+
+#+begin_src python :results none :exports code
+def qsort(xs):
+    if len(xs) <= 1:
+        return xs
+    left, right, pivot = [], [], xs[0]
+    for x in xs[1:]:
+        if x < pivot:
+            left.append(x)
+        if x >= pivot:
+            right.append(x)
+    return qsort(left) + [pivot] + qsort(right)
+#+end_src
+
+Note the  boundary/stopping condition here: it's the check on the length of the list ~len(xs) <=1~. When using recursion, always think about the stopping condition. If you mis a corner case, your code will keep running. Often it will claim more and more memory, and your computer will crash.
+
+** Peter and Paul, memoizatoin and boundary conditions.
+We have Peter and Paul betting on the outcome of a coin.
+Peter wins a dollar if it lands heads, which happens with probability $21/50$; if it lands tails, Paul wins a dollar. Peter starts with 15 dollar, and Paul with 25. The game stops when either one of them runs out of money. What is the probability that Peter wins?
+
+Let $u_{n}$ denote the probability that Peter wins if he has $n$ dollars. Clearly, $u_{n}$ satisfies the recursion:
+\begin{equation}
+u_n = u_{n+1} 21/50 + u_{n-1} 19/50,
+\end{equation}
+with $un_0 = 0$ and $u_{40}=1$.
+
+Let's turn this into code. I use /memoization/ (check the web), as this leads to extremely nice and readable code.
+
+#+begin_src python :results none :exports code
+
+#+end_src
+
+
+* Decision Trees
+
+
+To build this, I started reading the code of Kroeze, but I did not like the implementation.
+I found it hard to understand, and (worse perhaps) I found the the code kind of ugly.
+
+Since I don't enjoy reading ugly things, I tried to find another resource.
+Searching on the web on ~scratch, decision, tree~ led me to [[https://machinelearningmastery.com/implement-decision-tree-algorithm-scratch-python/][this useful site]].
+But this also was not the way I like to see trees implemented.
+For instance, the code does not use classes, which makes the code a bit unorganized.
+There also points that confuse me, like the use of ~row~ and ~index~.
+I find it hard to memorize that ~index~ refers to a column of ~X~, that a ~row~ is a row of ~X~ (why not call it ~X[i,:]~?), and that ~row[-1]~ is the label ~Y~. Then, they don't use classes, but here  classes shine, due to the recursive structure. Moveover, I want to use numpy.
+
+So, I decided to build my own tree, but steal what seemed the best of the code of the above two resources.
+
+Below I assume that you
+
+** A tree class
+
+A tree is a bunch of branches, but branches can have sub branches, and so on. But, since a branch behaves like a tree, it suffices to have a ~Tree~ class. Left and right branches are also trees.
+
+I use two class attributes.  We don't want to split a tree when it has less than  ~min_size~ datapoints.
+We also don't want to split when a tree's depths exceeds ~max_depth~. As all trees in one tree must satisfy these constraints, it's is convenient to set these as class attributes.
+
+
+#+name: class_tree
+#+begin_src python :results none :exports code
+class Tree:
+    min_size = 1
+    max_depth = 0
+#+end_src
+
+** Initialize an instance
+
+The ~X~ is the feature vector, ~Y~ the response, ~left~ and ~right~ refer to a left and right tree, if present. Finally, ~split_col~ is the column to use in a measurement ~x~ of features,  the ~split_value~ is the value to use to split.
+
+I'll discuss the weights ~w~ below, in the section on the scores.
+
+#+name: init
+#+begin_src python :results none :exports code
+def __init__(self, X, Y, w=None, depth=0):
+    self.X = X
+    self.Y = Y
+    if w is None:
+        w = np.ones(len(Y))
+    self.w = w / w.sum()
+    self.depth = depth
+    self.left, self.right = None, None
+    self.split_col = None
+    self.split_value = None
+
+#+end_src
+
+The reason is to set ~w=None~ initially, is to allow to call ~Tree(X,Y)~. In that case the weights should be uniform. I achieve that with the above code.
+
+The size of a tree is determined by the number of datapoints it contains. For this I can just check on ~len(self.Y)~, but I prefer to read ~size()~. To help understand my code, I define a helper function.
+
+#+NAME: size_definition
+#+BEGIN_SRC python :noweb yes :exports code
+def size(self):
+    return len(self.Y)
+#+end_src
+
+** Score function
+I know that I'll need a score function for a tree in the tree. I can also test this independently, so I'll build that first.
+
+Before building the score, we need  $p(z)$:
+\begin{align}
+p_{z} &= \frac{1}{|\sigma|} \sum_{y \in \sigma}\1{y=z}.
+\end{align}
+Later, when we will consider /boosting/ we need a more general function $p(z)$ that takes into account the weights of (mis)classifying a point. When $w(y)$ is this weight, with the vector $w$ such that $\sum_{y\in \sigma} w(y) = 1$, then define
+\begin{align}
+p_{z} &= \sum_{y \in \sigma} w(y)\1{y=z}.
+\end{align}
+In case $w(y) = 1/|\sigma|$, we retrieve our earlier function
+
+
+I'll use Gini's impurity function to score the misclassificaton of the tree. From the definitions of Kroeze et al:
+\begin{align}
+\label{eq:1}
+G &= \frac{1}{2}\left(1-\sum_z p_z^2\right).
+\end{align}
+
+With $p(z)$ it's easy to also build the entropy. Let's do that also here.
+
+Finally, ~score~ is a convenience function. If I later want to use another score function, such as the entropy, I don't have to worry about where the score function is called. I just call another function from ~score~ then ~gini~, and every else I use ~score~.
+
+#+name: score
+#+begin_src python :results none :exports code
+def p(self, z):
+    return self.w[self.Y == z].sum()
+
+def entropy(self):
+    res = np.array([self.p(z) for z in np.unique(self.Y)])
+    return -res @ np.log(res)
+
+def gini(self):
+    res = np.array([self.p(z) for z in np.unique(self.Y)])
+    return (1 - res @ res) / 2
+
+def score(self):
+    return self.gini()
+#+end_src
+
+** Propose a split
+
+I have to split the data along a certain column, for instance ~X[:, col]~. Then for a given value,   I should put all ~X[i,col] < value~ in the left tree, and the rest in the right tree. The selector ~X[:,col] < value~ gives all rows that have to go the left. By inverting the selector, I  get the rest of the row. Note that I also add a level by splitting.
+
+#+name: proposed_split
+#+begin_src python :results none :exports code
+def proposed_split(self, col, value):
+    s = self.X[:, col] < value
+    left = Tree(self.X[s], self.Y[s], self.w[s], self.depth + 1)
+    s = np.invert(s)
+    right = Tree(self.X[s], self.Y[s], self.w[s], self.depth + 1)
+    return left, right
+#+end_src
+
+** Optimal split
+
+I have to find the best split of the data. For this, I run over each column in ~self.X~. Then for a given column, I find the best value to split the rows. This best value must be element of ~self.X~, so I keep a reference to the best column and best row.
+
+The score  of a split into a left and right tree is the sum of the Gini scores of the left and right trees.
+
+#+name: optimal_split
+#+begin_src python :results none :exports code
+def set_optimal_split(self):
+    n, p = self.X.shape
+    best = np.infty
+    best_row = 0
+    best_col = 0
+    for j in range(p):
+        for i in range(n):
+            left, right = self.proposed_split(col=j, value=self.X[i, j])
+            score = left.score() + right.score()
+            if score < best:
+                best, best_row, best_col = score, i, j
+    self.split_col = best_col
+    self.split_value = self.X[best_row, best_col]
+    return self.proposed_split(self.split_col, self.split_value)
+#+end_src
+
+** Do the split
+
+Once I know the optimal split, I just have to implement the split.
+However, if the size of the tree is too small of if the ~max_depth~ is reached, I should not split.
+Also, when, after an optimal split, the left or right tree is empty, there is nothting to split.
+If there is a split, to make, then do it, and see recursively if the left and right tree need to be split also.
+Since these trees are instances of ~Tree~, and can leave the process of splitting entirely to each of the trees themselves.
+This is the beauty, but perhaps also a bit of the magic, of recursion.
+
+
+#+name: do_split
+#+begin_src python :results none :exports code
+def split(self):
+    if self.size() <= self.min_size or self.depth >= self.max_depth:
+        return
+    left, right = self.set_optimal_split()
+    if left.size() == 0 or right.size() == 0:
+        return
+    self.left, self.right = left, right
+    self.left.split()
+    self.right.split()
+
+#+end_src
+
+** Classify
+
+I need to know when a tree is a terminal(end) tree, because the search has reached aterminal tree, the tree should return a classifier. So, when is a tree a terminal tree? Well, if it has a left and right tree, a tree is not a terminal tree (because we split it), and other it is.
+
+Here I use a majority vote to classify. ~np.unique~ gives all unique values in ~self.Y~ and also how often they occur. So, ~np.argmax(count)~ gives the index of the value that occurs most. If I return the value with that index, I get the values that occurs most often.
+
+#+name: terminal
+#+begin_src python :results none :exports code
+def terminal(self):
+    return self.left == None or self.right == None
+
+def majority_vote(self):
+    values, counts = np.unique(self.Y, return_counts=True)
+    return values[np.argmax(counts)]
+
+#+end_src
+
+** Predict
+
+If the search to classify a new feature vector ~x~ (note that this is normal letter, not a capital) along the trees reaches a terminal tree, then return its majority vote.
+Otherwise, for that tree I know I have to split along the optimal column ~self.split_col~ and compare ~x[self.split_col]~ with the best value ~self.split_value~.
+Depending on the outcome, I leave the rest of the prediction to the left or right tree.
+
+#+name: predict
+#+begin_src python :results none :exports code
+def predict(self, x):
+    if self.terminal():
+        return self.majority_vote()
+    if x[self.split_col] < self.split_value:
+        return self.left.predict(x)
+    else:
+        return self.right.predict(x)
+#+end_src
+
+** Printing
+
+Here is some code to print the tree. I only used it to debug, and to compare my output to that of the  site to which I referred above,
+
+#+name: print
+#+begin_src python :results none :exports code
+def __repr__(self):
+    d = " " * self.depth
+    if not self.terminal():
+        res = f"{d}X[{self.split_col}] < {self.split_value}\n"
+        res += f"{d}L {self.left}\n"
+        res += f"{d}R {self.right}\n"
+    else:
+        res = f"{d}T [{self.majority_vote()}]"
+    return res
+
+#+end_src
+
+** A test
+
+#+name: tests
+#+begin_src python :results none :exports code
+def test_gini(Y):
+    values, counts = np.unique(Y, return_counts=True)
+    return (1 - sum(counts ** 2) / len(Y) ** 2) / 2
+
+def test():
+    np.random.seed(3)
+    X = np.array(
+        [
+            [2.771244718, 1.784783929],
+            [1.728571309, 1.169761413],
+            [3.678319846, 2.81281357],
+            [3.961043357, 2.61995032],
+            [2.999208922, 2.209014212],
+            [7.497545867, 3.162953546],
+            [9.00220326, 3.339047188],
+            [7.444542326, 0.476683375],
+            [10.12493903, 3.234550982],
+            [6.642287351, 3.319983761],
+        ]
+    )
+    Y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+
+    Tree.max_depth = 3
+    Tree.min_size = 1
+    tree = Tree(X, Y, w=np.ones(len(Y)) / len(Y)) # set uniform weights
+    print(tree.gini())
+    print(test_gini(Y))
+    tree.split()
+    print(tree)
+
+if __name__ == "__main__":
+    test()
+#+end_src
+** Complete class definition
+
+
+
+#+begin_src python :noweb yes :exports code :tangle ../code/tree.py
+import numpy as np
+
+<<class_tree>>
+
+    <<init>>
+
+    <<size_definition>>
+
+    <<score>>
+
+    <<proposed_split>>
+
+    <<optimal_split>>
+
+    <<do_split>>
+
+    <<terminal>>
+
+    <<predict>>
+
+    <<print>>
+
+<<tests>>
+#+end_src
+
+
+* Exercises
+
+- Define (and do) some test to test the Tree class.  Here are some simple (and dumb) things to test:
+  1. Test on ~min_size=0~? Should the tree crash? What should happen in that case?
+  2. Test on  ~max_depth=np.infty~? Then the size of each branch should be at most ~min_size~ large. Is that indeed true?
+  3. What happens if you pass ~X=[]~, i.e., an empty array to the tree?
+  4. What if all values of ~X~ are the same?
+  5. What if all values of ~Y~ are the same?
+  6. What if just one value of ~Y~ is different?
+  7. Can we mix positive and negative values in ~Y~ and/or ~X~? Of course, all should work, but does it actually?
+  8. If you like, add some error checking. For instance, ensure that the shapes of $X$, $Y$ and $w$ are compatible. Are the divisions by zero that can give strange errors?
+- Compare the code of DSML and the site of Jason to my code.
+  1. What parts of each code do you like? Why?
+  2. Can you see what ideas of DSML and Jason I copied?
+  3. Do you understand why I changed certain parts?
+  4. Think about how you would build your code based on these three examples of code.

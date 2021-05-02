@@ -1,0 +1,201 @@
+#+title: Machine Learning: algorithms, Code Lecture 5
+#+subtitle: Trees
+#+author: Nicky van Foreest
+#+date: \today
+
+
+#+STARTUP: overview
+#+OPTIONS:  toc:1 H:2
+
+# +include: preamble_presentation.org
+#+include: preamble_handout.org
+
+
+* Configuration for lecture                                        :noexport:
+
+# +begin_src emacs-lisp
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 4.0))
+(modus-themes-load-operandi)
+(set-face-attribute 'default nil :height 220)
+#+end_src
+
+And config back
+#+begin_src emacs-lisp
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 2.0))
+(modus-themes-load-vivendi)
+(set-face-attribute 'default nil :height 95)
+#+end_src
+
+C-u C-u C-c C-x C-l to preview all
+
+* Overview
+- Last lecture
+  - Trees
+- This lecture
+  - Bagging
+  - Random forests
+- Next lecture:
+
+
+* Bagging
+
+I used this site about [[https://machinelearningmastery.com/implement-bagging-scratch-python/][bagging]] very helpful to develop  my own code. However, I also have some strong objections against how the code is organized there. Let me first show you my code, and then discuss the other code.
+
+** Implementation
+
+I can use the ~Tree~ class I derived earlier.
+#+name: imports
+#+begin_src python :results none :exports code
+import numpy as np
+
+from tree import Tree
+
+rng = np.random.default_rng(3)
+#+end_src
+Note that I don't use ~from tree import *~.  As a matter of principle, you should never import everything from other modules. See the exercises below to understand why.
+
+
+#+name: class_bag
+#+begin_src python :results none :exports code
+class Bag:
+    min_size = 1
+    max_depth = 0
+
+    def __init__(self, X, Y, n_trees):
+        self.X = X
+        self.Y = Y
+        self.n_trees = n_trees
+        Tree.min_size = self.min_size
+        Tree.max_depth = self.max_depth
+        self.trees = []
+#+end_src
+
+A bag constists of ~n_trees~ trees, each of which uses a bootstrap of the data to build the tree. The next method of ~Bag~ implements this.
+
+#+name: make_trees
+#+begin_src python :results none :exports code
+def make_trees(self):
+    n, p = self.X.shape
+    for _ in range(self.n_trees):
+        bootstrap = rng.integers(low=0, high=n, size=n)
+        X, Y = self.X[bootstrap], self.Y[bootstrap]
+        tree = Tree(X, Y)
+        tree.split()
+        self.trees.append(tree)
+#+end_src
+
+The last step is to predict the class to which a certain measurement ~x~ must belong.
+We use again a majority vote, just as in the case of a single tree. You should check in the implementation of the ~Tree~ how to find the most occurring class. The idea below follows the same logic. Finally, ~predict~ is just a convenience function. If we want to use bags for regression, then we can still use ~predict~, but then use a another internal method to compute the regression.
+
+#+name: predict
+#+begin_src python :results none :exports code
+def majority_vote(self, x):
+    predictions = [t.predict(x) for t in self.trees]
+    values, counts = np.unique(predictions, return_counts=True)
+    return values[np.argmax(counts)]
+
+def predict(self, x):
+    return self.majority_vote(x)
+#+end_src
+
+** A test
+
+#+name: test_bag
+#+begin_src python :results none :exports code
+def test():
+    X = np.array(
+        [
+            [2.771244718, 1.784783929],
+            [1.728571309, 1.169761413],
+            [3.678319846, 2.81281357],
+            [3.961043357, 2.61995032],
+            [2.999208922, 2.209014212],
+            [7.497545867, 3.162953546],
+            [9.00220326, 3.339047188],
+            [7.444542326, 0.476683375],
+            [10.12493903, 3.234550982],
+            [6.642287351, 3.319983761],
+        ]
+    )
+    Y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+
+    Bag.max_depth = 2
+    Bag.min_size = 1
+    bag = Bag(X, Y, n_trees=50)
+    bag.make_trees()
+
+    tests = [[3, 10], [4, -5], [6, 1], [7, 2], [8, 5]]
+    for x in tests:
+        print(f"Predicted class of {x}: {bag.predict(x)}")
+#+end_src
+
+** Tangle :noexport:
+
+#+begin_src python :noweb yes :exports none :tangle ../code/bag.py
+<<imports>>
+
+<<class_bag>>
+
+    <<make_trees>>
+
+    <<predict>>
+
+    <<print>>
+
+<<test_bag>>
+
+if __name__ == "__main__":
+    test()
+#+end_src
+
+
+** Discussion of other code
+
+The code at this  [[https://machinelearningmastery.com/implement-bagging-scratch-python/][site]] has some shortcomings  as far as I am concerned.
+- There is one function to make bags and test them at the same time. This is weird. Such conceptual ideas should be split. Building is not the same as testing.
+- Some functions do too much. For instance, the ~gini_index~ function computes the gini index for each group and then computes the overall score too. It's better to split this. Compute a score for a group in one function, and compute the total score in another function. Like this, if you want to use another score function for a group, you just have make a change in one place, rather than two. In general, the more dependencies among different pieces of code, the buggier it becomes. It's way better to build one function for each separate task.
+- There are strange names: ~sample_size~ evokes (for me at least) an ~int~, not a ~float~. But the author uses this variable as a fraction. Why not call it ~sample_frac~?
+
+
+* Random forests
+
+A useful site for [[https://machinelearningmastery.com/implement-random-forest-scratch-python/][random forests]]
+
+
+* Cross validation
+
+- Hyper parameter, example: power of the polynomial
+- Bias: bias descreases as a function of model complexity
+- Variance: variance increases as a function of model complexity, as model becomes more sensitive to the data chosen/used
+
+
+** LOOCV ?
+
+Include some silly code. That is what happens if you only learn to use standard libraries. You will not develop the algorithmic skills that you will need in your job (even cleaning data requires algorithms, and there are no general libraries to help clean data, as it is data(format) dependent.)
+
+** Once CV is done, what to do?
+
+I found it unclear what to do after the cross-validation is done.
+The idea is this:
+- With CR we search for (a) good---searching for optimalilty is nearly always a mathematical deviation (disorder), based on too much playing with (believing in ) in toy models---hyper-parameter(s).
+- Once we found good hyperparameters we fit the model on all available data.
+
+
+* Some examples of bad code ideas
+
+In the bagging code, from which I learned a lot btw, the author mixes the /contruction/ of a bag with the /testing/ of bags.  In my opinion that is a bad idea. These two parts of software should be split.
+
+* Exercises
+** Exercise 1,on code
+- Read  [[https://www.geeksforgeeks.org/why-import-star-in-python-is-a-bad-idea/][here]] to understand why using ~import *~ is a very bad idea. Let me be honest again: DSML use this style quite a bit. What annoys me about the code in the DSML is that they have very different standards about how math should look like (impeccable), and code should look like (ugly, bad style, bad formating). This is just as awkard in the other way around, correct code and wrong math.
+- Perhaps you like the explanations of this [[https://www.betterdatascience.com/mml-decision-trees/][site]].
+  1. I like that the author uses classes. Of course I like my own ~Tree~ class better. (There is no reason to have ~Node~ class and a ~DecisionTree~ class.) However, beauty is in eye of the beholder, so study which of the two you like best.
+  2. I also like that the authors builds a ~fit~ method. The reason I don't do that is that this does not add much to the fundamental understanding algorithm, hence, adding a ~fit~ function adds `clutter'. (Besides we are never actually going to use these functions anyway; for real cases, we use the real thing, i.e., ~scikit~.)
+  3. I don't like the documentation in between the code. It makes it hard to focus on (and locate)  the real code. That is one of the reasons I like the concept of /literate programming/ much more. Code and documentation are very clearly separated, which adds much to the understanding of the code.
+- You might also like to  check this [[https://www.betterdatascience.com/mml-random-forest/][site]]. Interestling, does the author call /random forest/ what we call /bagging/? I think so, but I haven't  study the code  in detail, so I might be wrong.
+
+
+
+
+
+* Flappy bird and inventory control
