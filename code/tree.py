@@ -39,11 +39,9 @@ class Tree:
 
     def score_of_split(self, i, j):
         s = self.X[:, j] <= self.X[i, j]
-        l_score = self.score(self.Y[s])
-        r_score = self.score(self.Y[~s])
-        tot = l_score * len(self.Y[s]) / len(self.Y)
-        tot += r_score * len(self.Y[~s]) / len(self.Y)
-        return tot
+        l_score = self.score(self.Y[s]) * len(self.Y[s]) / len(self.Y)
+        r_score = self.score(self.Y[~s]) * len(self.Y[~s]) / len(self.Y)
+        return l_score + r_score
 
     def find_optimal_split(self):
         n, p = self.X.shape
@@ -67,7 +65,7 @@ class Tree:
         self.find_optimal_split()
         if self.split_col == None:
             return
-        s = self.X[:, self.split_col] < self.split_value
+        s = self.X[:, self.split_col] <= self.split_value
         if s.all() or (~s).all():
             return
         self.left = Tree(depth=self.depth + 1)
