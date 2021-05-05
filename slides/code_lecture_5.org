@@ -39,12 +39,16 @@ C-u C-u C-c C-x C-l to preview all
 
 * Bagging
 
-I used this site about [[https://machinelearningmastery.com/implement-bagging-scratch-python/][bagging]] very helpful to develop  my own code. However, I also have some strong objections against how the code is organized there. Let me first show you my code, and then discuss the other code.
+I used this [[https://machinelearningmastery.com/implement-bagging-scratch-python/][site]] very useful to help understand how bagging works, and I copied a bunch of ideas from that site.
+However, I also have some strong objections against how the code is organized there.
+Let me first show you my code, and then discuss my objections.
+
+You can find ~bag.py~ in the ~code~ directory on ~github~.
 
 ** Implementation
 
 I can use the ~Tree~ class I derived earlier.
-#+name: imports
+#+name: imports_bags
 #+begin_src python :results none :exports code
 import numpy as np
 
@@ -72,7 +76,7 @@ class Bag:
 
 A bag constists of ~n_trees~ trees, each of which uses a bootstrap of the data to build the tree. The next method of ~Bag~ implements this.
 
-#+name: make_trees
+#+name: make_bag_trees
 #+begin_src python :results none :exports code
 def make_trees(self):
     n, p = self.X.shape
@@ -84,8 +88,11 @@ def make_trees(self):
         self.trees.append(tree)
 #+end_src
 
-The last step is to predict the class to which a certain measurement ~x~ must belong.
-We use again a majority vote, just as in the case of a single tree. You should check in the implementation of the ~Tree~ how to find the most occurring class. The idea below follows the same logic. Finally, ~predict~ is just a convenience function. If we want to use bags for regression, then we can still use ~predict~, but then use a another internal method to compute the regression.
+The last step is to predict the label of a new measurement ~x~.
+We use again a majority vote, just as in the case of a single tree.
+You should check in the implementation of the ~Tree~ how to find the most occurring label.
+The idea below follows the same logic.
+Finally, ~predict~ is just a convenience function that call the ~majority_vote~ method; if we want to use bags for regression, then we can still use ~predict~, but then use a another internal method to predict the  regression.
 
 #+name: predict
 #+begin_src python :results none :exports code
@@ -97,6 +104,7 @@ def majority_vote(self, x):
 def predict(self, x):
     return self.majority_vote(x)
 #+end_src
+
 
 ** A test
 
@@ -129,14 +137,15 @@ def test():
         print(f"Predicted class of {x}: {bag.predict(x)}")
 #+end_src
 
+
 ** Tangle :noexport:
 
 #+begin_src python :noweb yes :exports none :tangle ../code/bag.py
-<<imports>>
+<<imports_bags>>
 
 <<class_bag>>
 
-    <<make_trees>>
+    <<make_bag_trees>>
 
     <<predict>>
 
@@ -149,6 +158,8 @@ if __name__ == "__main__":
 #+end_src
 
 
+
+
 ** Discussion of other code
 
 The code at this  [[https://machinelearningmastery.com/implement-bagging-scratch-python/][site]] has some shortcomings  as far as I am concerned.
@@ -159,7 +170,103 @@ The code at this  [[https://machinelearningmastery.com/implement-bagging-scratch
 
 * Random forests
 
-A useful site for [[https://machinelearningmastery.com/implement-random-forest-scratch-python/][random forests]]
+I found this site useful for [[https://machinelearningmastery.com/implement-random-forest-scratch-python/][random forests]]. However, I made my own implementation.
+
+You can find ~random_forest.py~ in the ~code~ directory on ~github~.
+
+
+** Implementation
+
+The imports for a random forest are mostly the same as for the bag. As you'll see in a minute, I can make a random forest by subclassing a bag. (Classes are so elegant, once you get the hang of it.)
+
+#+name: rf_imports
+#+begin_src python :session :results none :exports code
+
+import numpy as np
+from scipy.stats import bernoulli
+
+from tree import Tree
+from bag import Bag
+
+rng = np.random.default_rng(3)
+#+end_src
+
+To get a random forest, I can subclass a ~Bag~, and overwrite the method to make trees. I have to fix the number of features that each tree should use. Hence, I have to overwrite the ~__init__~ method, since there is the extra argument ~n_features~; the rest I can pass on to ~Bag.__init__~.
+
+
+#+name: rf_class
+#+begin_src python :session :results none :exports code
+class RandomForest(Bag):
+    min_size = 1
+    max_depth = 0
+
+    def __init__(self, X, Y, n_trees, n_features):
+        super().__init__(X, Y, n_trees)
+        self.n_features = n_features
+#+end_src
+
+Making the trees for a random forest is nearly the same as making trees for a bag. We have to bootstrap a number of samples ~X~ of ~self.X~. Then, from the $p$ features (columns of ~X~), we have to choose ~n_features~ at random without replacements. Then we build a tree for the `thinned' observations. And that is all there is to it. The rest of the methods we inherit right away from ~Bag~; no sweat here.
+
+#+name: rf_make_trees
+#+begin_src python :results none :exports code
+def make_trees(self):
+    n, p = self.X.shape
+    for _ in range(self.n_trees):
+        bootstrap = rng.integers(low=0, high=n, size=n)
+        X, Y = self.X[bootstrap], self.Y[bootstrap]
+        features = rng.choice(range(p), size=self.n_features, replace=False)
+        tree = Tree(X[:, features], Y)
+        tree.split()
+        self.trees.append(tree)
+#+end_src
+
+** A test
+
+#+name: rf_test
+#+begin_src python :session :results output :exports both
+def test():
+    X = np.array(
+        [
+            [2.771244718, 1.784783929],
+            [1.728571309, 1.169761413],
+            [3.678319846, 2.81281357],
+            [3.961043357, 2.61995032],
+            [2.999208922, 2.209014212],
+            [7.497545867, 3.162953546],
+            [9.00220326, 3.339047188],
+            [7.444542326, 0.476683375],
+            [10.12493903, 3.234550982],
+            [6.642287351, 3.319983761],
+        ]
+    )
+    Y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+
+    RandomForest.max_depth = 2
+    RandomForest.min_size = 1
+    rf = RandomForest(X, Y, n_trees=50, n_features=1)
+    rf.make_trees()
+
+    tests = [[3, 10], [4, -5], [6, 1], [7, 2], [8, 5]]
+    for x in tests:
+        print(f"Predicted class of {x}: {rf.predict(x)}")
+#+end_src
+
+#+RESULTS: rf_test
+
+** Tangle                                                         :noexport:
+
+#+begin_src python :noweb yes :exports none :tangle ../code/random_forest.py
+<<rf_imports>>
+
+<<rf_class>>
+
+    <<rf_make_trees>>
+
+<<rf_test>>
+
+if __name__ == "__main__":
+    test()
+#+end_src
 
 
 * Cross validation
@@ -187,12 +294,12 @@ In the bagging code, from which I learned a lot btw, the author mixes the /contr
 
 * Exercises
 ** Exercise 1,on code
-- Read  [[https://www.geeksforgeeks.org/why-import-star-in-python-is-a-bad-idea/][here]] to understand why using ~import *~ is a very bad idea. Let me be honest again: DSML use this style quite a bit. What annoys me about the code in the DSML is that they have very different standards about how math should look like (impeccable), and code should look like (ugly, bad style, bad formating). This is just as awkard in the other way around, correct code and wrong math.
+- Read  [[https://www.geeksforgeeks.org/why-import-star-in-python-is-a-bad-idea/][here]] to understand why using ~import *~ is a very bad idea. Let me be honest: DSML use this style quite a bit. What annoys me slightly about the code in the DSML is that they have very different standards about how math should look like (impeccable), and how code should look like (a bit ugly, bad formating here and there). This is just as awkard in the other way around, correct code and wrong math.
 - Perhaps you like the explanations of this [[https://www.betterdatascience.com/mml-decision-trees/][site]].
   1. I like that the author uses classes. Of course I like my own ~Tree~ class better. (There is no reason to have ~Node~ class and a ~DecisionTree~ class.) However, beauty is in eye of the beholder, so study which of the two you like best.
-  2. I also like that the authors builds a ~fit~ method. The reason I don't do that is that this does not add much to the fundamental understanding algorithm, hence, adding a ~fit~ function adds `clutter'. (Besides we are never actually going to use these functions anyway; for real cases, we use the real thing, i.e., ~scikit~.)
-  3. I don't like the documentation in between the code. It makes it hard to focus on (and locate)  the real code. That is one of the reasons I like the concept of /literate programming/ much more. Code and documentation are very clearly separated, which adds much to the understanding of the code.
-- You might also like to  check this [[https://www.betterdatascience.com/mml-random-forest/][site]]. Interestling, does the author call /random forest/ what we call /bagging/? I think so, but I haven't  study the code  in detail, so I might be wrong.
+  2. I also like that the author builds a ~fit~ method. The reason I don't do that is that this does not add much to the fundamental understanding algorithm, hence, adding a ~fit~ function adds `clutter'. (Besides we are never actually going to use these functions anyway; for real cases, we use the real thing, i.e., ~scikit~.)
+  3. I don't like the documentation in between the code. It makes it hard to focus on (and locate)  the real code. That is one of the reasons I like the concept of /literate programming/ much more. In literate programming, Code and documentation are very clearly separated, which adds much to the understanding of the code, and the text.
+- You might also like to  check this [[https://www.betterdatascience.com/mml-random-forest/][site]]. There is a point of confusion: does the author call /random forest/ what we call /bagging/? I think so, but I haven't  studied the code  in detail, so I might be wrong.
 
 
 

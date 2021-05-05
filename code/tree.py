@@ -1,104 +1,101 @@
 import numpy as np
 
+
+def p(Y, z):
+    return (Y == z).sum() / len(Y)
+
+
+def missclassify(cls, Y):
+    res = np.array([p(Y, z) for z in np.unique(Y)])
+    return 1 - res.max(initial=0)
+
+
+def entropy(cls, Y):
+    res = np.array([p(Y, z) for z in np.unique(Y)])
+    return -res @ np.log(res)
+
+
+def gini(Y):
+    res = np.array([p(Y, z) for z in np.unique(Y)])
+    return 1 - res @ res
+
+
 class Tree:
     min_size = 1
-    max_depth = 0
+    max_depth = 1
 
-    def __init__(self, X, Y, w=None, depth=0):
-        self.X = X
-        self.Y = Y
-        if w is None:
-            w = np.ones(len(Y))
-        self.w = w / w.sum()
+    def __init__(self, depth=0):
+        self.X, self.Y = None, None
         self.depth = depth
         self.left, self.right = None, None
         self.split_col = None
         self.split_value = None
-    
 
     def size(self):
         return len(self.Y)
 
-    def p(self, z):
-        return self.w[self.Y == z].sum()
-    
-    def entropy(self):
-        res = np.array([self.p(z) for z in np.unique(self.Y)])
-        return -res @ np.log(res)
-    
-    def gini(self):
-        res = np.array([self.p(z) for z in np.unique(self.Y)])
-        return (1 - res @ res) / 2
-    
-    def score(self):
-        return self.gini()
+    def score(self, Y):
+        return gini(Y)
 
-    def proposed_split(self, col, value):
-        s = self.X[:, col] < value
-        left = Tree(self.X[s], self.Y[s], self.w[s], self.depth + 1)
-        s = np.invert(s)
-        right = Tree(self.X[s], self.Y[s], self.w[s], self.depth + 1)
-        return left, right
+    def score_of_split(self, i, j):
+        s = self.X[:, j] <= self.X[i, j]
+        l_score = self.score(self.Y[s])
+        r_score = self.score(self.Y[~s])
+        tot = l_score * len(self.Y[s]) / len(self.Y)
+        tot += r_score * len(self.Y[~s]) / len(self.Y)
+        return tot
 
-    def set_optimal_split(self):
+    def find_optimal_split(self):
         n, p = self.X.shape
-        best = np.infty
-        best_row = 0
-        best_col = 0
+        # best_score = np.inf
+        best_score = self.score(self.Y)
+        best_row = None
+        best_col = None
         for j in range(p):
             for i in range(n):
-                left, right = self.proposed_split(col=j, value=self.X[i, j])
-                score = left.score() + right.score()
-                if score < best:
-                    best, best_row, best_col = score, i, j
+                score = self.score_of_split(i, j)
+                if score < best_score:
+                    best_score, best_row, best_col = score, i, j
+                    # print("best", i, j, score)
+        self.split_row = best_row
         self.split_col = best_col
         self.split_value = self.X[best_row, best_col]
-        return self.proposed_split(self.split_col, self.split_value)
 
     def split(self):
         if self.size() <= self.min_size or self.depth >= self.max_depth:
             return
-        left, right = self.set_optimal_split()
-        if left.size() == 0 or right.size() == 0:
+        self.find_optimal_split()
+        if self.split_col == None:
             return
-        self.left, self.right = left, right
-        self.left.split()
-        self.right.split()
-    
+        s = self.X[:, self.split_col] < self.split_value
+        if s.all() or (~s).all():
+            return
+        self.left = Tree(depth=self.depth + 1)
+        self.left.fit(self.X[s], self.Y[s])
+        self.right = Tree(depth=self.depth + 1)
+        self.right.fit(self.X[~s], self.Y[~s])
+
+    def fit(self, X, Y):
+        self.X, self.Y = X, Y
+        self.split()
 
     def terminal(self):
         return self.left == None or self.right == None
-    
+
     def majority_vote(self):
         values, counts = np.unique(self.Y, return_counts=True)
         return values[np.argmax(counts)]
-    
 
     def predict(self, x):
         if self.terminal():
             return self.majority_vote()
-        if x[self.split_col] < self.split_value:
+        if x[self.split_col] <= self.split_value:
             return self.left.predict(x)
         else:
             return self.right.predict(x)
 
-    def __repr__(self):
-        d = " " * self.depth
-        if not self.terminal():
-            res = f"{d}X[{self.split_col}] < {self.split_value}\n"
-            res += f"{d}L {self.left}\n"
-            res += f"{d}R {self.right}\n"
-        else:
-            res = f"{d}T [{self.majority_vote()}]"
-        return res
-    
-
-def test_gini(Y):
-    values, counts = np.unique(Y, return_counts=True)
-    return (1 - sum(counts ** 2) / len(Y) ** 2) / 2
 
 def test():
-    np.random.seed(3)
     X = np.array(
         [
             [2.771244718, 1.784783929],
@@ -115,13 +112,14 @@ def test():
     )
     Y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
 
-    Tree.max_depth = 3
+    Tree.max_depth = 1
     Tree.min_size = 1
-    tree = Tree(X, Y, w=np.ones(len(Y)) / len(Y)) # set uniform weights
-    print(tree.gini())
-    print(test_gini(Y))
-    tree.split()
-    print(tree)
+    tree = Tree()
+    tree.fit(X, Y)
+
+    for x in X:
+        print(tree.predict(x))
+
 
 if __name__ == "__main__":
     test()
