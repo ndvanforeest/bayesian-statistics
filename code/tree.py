@@ -5,12 +5,12 @@ def p(Y, z):
     return (Y == z).sum() / len(Y)
 
 
-def missclassify(cls, Y):
+def missclassify(Y):
     res = np.array([p(Y, z) for z in np.unique(Y)])
     return 1 - res.max(initial=0)
 
 
-def entropy(cls, Y):
+def entropy(Y):
     res = np.array([p(Y, z) for z in np.unique(Y)])
     return -res @ np.log(res)
 
@@ -35,12 +35,15 @@ class Tree:
         return len(self.Y)
 
     def score(self, Y):
+        # return missclassify(Y)
         return gini(Y)
 
     def score_of_split(self, i, j):
         s = self.X[:, j] <= self.X[i, j]
         l_score = self.score(self.Y[s]) * len(self.Y[s]) / len(self.Y)
         r_score = self.score(self.Y[~s]) * len(self.Y[~s]) / len(self.Y)
+        score = ((self.Y[s] != -1).sum() + (self.Y[~s] != 1).sum()) / len(self.Y)
+        print("een:", l_score + r_score, score)
         return l_score + r_score
 
     def find_optimal_split(self):
@@ -109,6 +112,7 @@ def test():
         ]
     )
     Y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+    Y = 2 * Y - 1
 
     Tree.max_depth = 1
     Tree.min_size = 1
