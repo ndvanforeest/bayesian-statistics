@@ -40,11 +40,12 @@ C-u C-u C-c C-x C-l to preview all
   - ridge regression
   - lasso
 - Next lecture:
+  - Recurion
   - Decision trees
 
 Recall, the goal of this lecture (and set of handouts) is to provide you with working code and explain how the code works.
 
-* LP (PULP) and graphs (networkx)
+* LP (~Pulp~) and graphs (~networkx~)
 
 ** Intro and motivation
  From the theory lectures and DSML you learned that Lasso can only be solved with optimization tools; there are not closed-form solutions to get the $\beta$ directly.
@@ -116,6 +117,7 @@ import pulp
 
 Here are the nodes with the task  durations, e.g., node 1 has a duration of 5.
 
+#+name: nodes
 #+begin_src python :session :results none :exports both
 nodes = (
     (1, 5),
@@ -137,6 +139,7 @@ nodes = (
 
 And the edges.
 
+#+name: edges
 #+begin_src python :session :results none :exports both
 edges = [
     (1, 2),
@@ -289,6 +292,7 @@ This is good news: the problem is solved to optimality.
 Here are the earliest starting, completion times, and slacks. All jobs that have zero slack are in the critical path.
 
 
+#+name: result
 #+begin_src python :session :results output :exports both
 for j in cpm.nodes():
     print(
@@ -296,33 +300,25 @@ for j in cpm.nodes():
     )
 #+end_src
 
-#+RESULTS:
-#+begin_example
-1 0.0 5.0 0.0
-2 5.0 12.0 1.0
-3 5.0 14.0 0.0
-4 11.0 24.0 1.0
-5 14.0 26.0 5.0
-6 14.0 26.0 0.0
-7 23.0 34.0 1.0
-8 26.0 36.0 4.0
-9 26.0 36.0 0.0
-10 33.0 43.0 1.0
-11 36.0 43.0 0.0
-12 43.0 51.0 0.0
-13 43.0 51.0 1.0
-14 51.0 56.0 0.0
-Cmax 56.0 56.0 0.0
-#+end_example
 
 The project completion time is $56$ time units.
 
 ** Summary
-Observe how ~networks~ helps us to model and solve this scheduling problem on conceptual level. We have to do astonishingly little ourselves, we can fully concentrate on getting the model correct and on the solution itself, and we don't have to be concerned with any  tough (numerical) algorithm.
+Observe how ~networkx~ helps us to model and solve this scheduling problem on a conceptual level. We have to do astonishingly little ourselves, we can fully concentrate on getting the model correct and on the solution itself, and we don't have to be concerned with any  tough (numerical) algorithm.
 
-To show you how little real code we actually need, here is what I would normally program. Actually, as for me, there is no need for much documentation, as the code tells me what is going on.
-#+begin_src python :noweb yes :exports code
+To show you how little real code we actually need, check ~cpm.py~ on ~github~.
+This is actuall what I would normally program; for me, there is much need for documentation, as the code tells me what is going on.
+Of course I need code to enter the data, such as the nodes, task durations and predecessors, and I need code to process the results. These parts of the code can be pretty big at times, BTW. However, as you can see, the engine itself is very short and conceptually clear.
+
+
+** Tangle                                                         :noexport:
+
+#+begin_src python :noweb yes :exports none :tangle ../code/cpm.py
 <<imports>>
+
+<<nodes>>
+
+<<edges>>
 
 <<cpm>>
 
@@ -341,18 +337,19 @@ To show you how little real code we actually need, here is what I would normally
 <<objective>>
 
 <<solve>>
+
+<<result>>
 #+end_src
 
 #+RESULTS:
 
-Of course I need code to enter the data, such as the nodes, task durations and predecessors, and I need code to process the results. These parts of the code can be pretty big at times, BTW. However, as you can see, the engine itself is very short and conceptually clear.
 
 
 * OLS
 
 Now I want to demonstrate how to solve OLS with the optimization library ~CVXPY~. I don't want to use ~sklearn~ directly, although that would be natural since we are dealing with a data analysis problem. However,  ~CVXPY~ is a generic tool, a tool we  can use for many other optimization tools, such as portfolio optimazation, inventory control, and so on. So, we learn one tool, but get lots of offspin.
 
-Below I will use  ~CVXPY~ to deal with lasso, but before trying such a tool on new problems, I prefer to see how it works  on I can check. Hence, let's tackle OLS first.
+Below I will use  ~CVXPY~ to deal with lasso, but before trying such a tool on new problems, I prefer to see how it works  on things I can check. Hence, let's tackle OLS first.
 
 
 Installing ~CVXPY~  took a bit of time (a few minutes) as apparently lots of stuff had to be compiled. Again I use ~pip~ for this.
@@ -362,6 +359,7 @@ pip install cvxpy
 #+end_src
 
 ** Imports
+#+name: ols_imports
 #+begin_src python :session :results none :exports code
 import numpy as np
 from numpy import linalg as LA
@@ -377,6 +375,7 @@ These predictors have some common functionality, which I therefore put in a base
 
 I'll derive a class for OLS, ridge regression and Lasso from the ~Preditor~ class.
 
+#+name: predictor
 #+begin_src python :session :results none :exports code
 class Predictor:
     def __init__(self, X, Y, gamma=0):
@@ -403,6 +402,8 @@ The ~solve~ method has to be implemented in the derived class.
 ** Regular OLS
 With the ~Predictor~ class, the implemention of an ~OLS~ class is very short. I just have to build the ~solve~ method; the rest can be inherited.
 
+
+#+name: ols
 #+begin_src python :session :results none :exports code
 class OLS(Predictor):
     def loss(self, X, Y, beta):
@@ -414,10 +415,12 @@ class OLS(Predictor):
 
 Thus, I use the regular way to solve an OLS.
 
-** OlS with CVXPY
+** OLS with CVXPY
 
-I  also want to build an OLS as a convex optimization problem, and then I let ~CVXPY~ solve it. (I modified the code I found  [[https://www.cvxpy.org/examples/basic/least_squares.html][here]].)
+I  also want to build OLS as a convex optimization problem, and then I let ~CVXPY~ solve it. (I modified the code I found  [[https://www.cvxpy.org/examples/basic/least_squares.html][here]].)
 
+
+#+name: ols_convex
 #+begin_src python :session :results none :exports code
 class OLS_convex(Predictor):
     def loss(self, X, Y, beta):
@@ -444,6 +447,7 @@ Since classes definitions themselves are also objects, we can pass them to test 
 
 To add to the confusion, ~Foo~ is both a type and an object. That is because ~Foo~ is an instance of the type ~type~ - but not of type ~Foo~. Understanding the distinction between objects and types is paramount in furthering your programming skills. I admit, it takes some time to understand, but once you do, you will write better code, with less mistakes, and you can yet more adhere to the DRY concept.)
 
+#+name: ols_test
 #+begin_src python :session :results none :exports code
 def test(method):
     np.random.seed(3)
@@ -478,6 +482,28 @@ Perhaps you find me a bit over cautious, but from experience I can tell you that
 Such intermediate checks help to locate mistakes that I might make later.
 In case errors occur later, it's unlikely I have to search for the problem in the points above.
 
+** Tangle                                                         :noexport:
+
+#+begin_src python :noweb yes :exports none :tangle ../code/ols.py
+<<ols_imports>>
+
+
+<<predictor>>
+
+
+<<ols>>
+
+
+<<ols_convex>>
+
+
+<<ols_test>>
+
+
+if __name__== "__main__":
+    test(OLS)
+    test(OLS_convex)
+#+end_src
 
 * Ridge regression
 
@@ -485,6 +511,7 @@ In case errors occur later, it's unlikely I have to search for the problem in th
 I first build rigde regression as explained in DSML.6.2; this method is  direct, i.e., it solves a problem of the form $A x = b$.
 If you have read the relevant parts,  the code below is evident.
 
+#+name: ridge
 #+begin_src python :session :results none  :exports code
 class Ridge(Predictor):
     def loss(self, X, Y, beta):
@@ -502,6 +529,7 @@ class Ridge(Predictor):
 
 I adapted the code I found here: [[https://www.cvxpy.org/examples/machine_learning/ridge_regression.html][cvxpy ridge]]. Just read the code, it is self explanatory.
 
+#+name: ridge_convex
 #+begin_src python :session :results none  :exports code
 class Ridge_convex(Predictor):
     def loss(self, X, Y, beta):
@@ -540,6 +568,7 @@ test(Ridge_convex)
 
 Finally we make a graph of how the mse and betas vary as  function of the regulation cost $\gamma$.
 
+#+name: performance_graphs
 #+begin_src python :session :results none  :exports code :cache yes
 def statistics_plotting(method):
     n, p = 100, 20
@@ -585,8 +614,11 @@ def statistics_plotting(method):
     plt.title("Regularization Path")
     fname = "figures/" + algo.__class__.__name__ + "_betas.pdf"
     plt.savefig(fname)
+#+end_src
 
+Now let's use it.
 
+#+begin_src python :session :results none  :exports code :cache yes
 statistics_plotting(Ridge_convex)
 #+end_src
 
@@ -618,9 +650,9 @@ When we don't want to include a penalty on the constant $\beta_{0}$ the construc
 Observe again that I do not include the $n$ term with the constant $\gamma$.
 Also, the ~dum~ stores the vector $1' X$ to save time in the other computations.
 
+#+name: ridge_constant
 #+begin_src python :session :results none  :exports both
 class Ridge_with_constant(Predictor):
-
     def solve(self):
         n, p = self.X.shape
         A = self.X.T @ self.X
@@ -641,7 +673,7 @@ There is not direct method to find the minimum in the objective for lasso; we ha
 
 Given the classes I already built above, there is not much work to do. In fact, the three lines below is all!
 
-
+#+name: lasso
 #+begin_src python :session :results none  :exports code
 class Lasso(Ridge_convex):
     def regularizer(self, beta):
@@ -680,6 +712,34 @@ And a plot of how the sizes of $\beta$ vary as a function of $\gamma.
 [[file:figures/Lasso_betas.pdf]]
 
 Recall from the ~statistics_plotting()~ function that the first 10 betas were 1 and the rest zero, i.e, $\beta_{i} = 1$ for $i<10$, and $\beta_i=0$ for $i=10,\ldots, p-1$. I have to admit that I am not particularly impressed by the selection of lasso. The test MSE achieves its minimum around $\gamma=100$. But I have a hard time to learn from the regularization paths what the best $\gamma$ should be.  Perhaps I made a mistake somewhere; if so, let me know.
+
+
+** Tangle                                                         :noexport:
+#+begin_src python :noweb yes :exports none :tangle ../code/ridge_and_lasso.py
+<<ols_imports>>
+from ols import Predictor, test
+
+<<ridge>>
+
+
+<<ridge_convex>>
+
+
+<<ridge_constant>>
+
+
+<<lasso>>
+
+
+<<performance_graphs>>
+
+
+if __name__ == "__main__":
+    test(Ridge)
+    test(Ridge_convex)
+    statistics_plotting(Ridge_convex)
+    statistics_plotting(Ridge_convex)
+#+end_src
 
 * General advice
 

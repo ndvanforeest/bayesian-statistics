@@ -30,11 +30,15 @@ C-u C-u C-c C-x C-l to preview all
 
 * Overview
 - Last lecture
-  - Trees
+  - Recursion and Trees
 - This lecture
   - Bagging
   - Random forests
+  - Cross validation
+  - Trees with weight
 - Next lecture:
+  - Boosting
+  - AdaBoost
 
 
 * Bagging
@@ -74,7 +78,7 @@ class Bag:
         self.trees = []
 #+end_src
 
-A bag constists of ~n_trees~ trees, each of which uses a bootstrap of the data to build the tree. The next method of ~Bag~ implements this.
+A bag consists of ~n_trees~ trees, each of which uses a bootstrap of the data to build the tree. The next method of ~Bag~ implements this.
 
 #+name: make_bag_trees
 #+begin_src python :results none :exports code
@@ -138,7 +142,7 @@ def test():
 #+end_src
 
 
-** Tangle :noexport:
+** Tangle                                                         :noexport:
 
 #+begin_src python :noweb yes :exports none :tangle ../code/bag.py
 <<imports_bags>>
@@ -177,7 +181,7 @@ You can find ~random_forest.py~ in the ~code~ directory on ~github~.
 
 ** Implementation
 
-The imports for a random forest are mostly the same as for the bag. As you'll see in a minute, I can make a random forest by subclassing a bag. (Classes are so elegant, once you get the hang of it.)
+The imports for a random forest are mostly the same as for the bag. As you'll see in a minute, I can make a random forest by sub-classing a bag. (Classes are so elegant, once you get the hang of it.)
 
 #+name: rf_imports
 #+begin_src python :session :results none :exports code
@@ -272,7 +276,7 @@ if __name__ == "__main__":
 * Cross validation
 
 - Hyper parameter, example: power of the polynomial
-- Bias: bias descreases as a function of model complexity
+- Bias: bias decreases as a function of model complexity
 - Variance: variance increases as a function of model complexity, as model becomes more sensitive to the data chosen/used
 
 
@@ -284,25 +288,95 @@ Include some silly code. That is what happens if you only learn to use standard 
 
 I found it unclear what to do after the cross-validation is done.
 The idea is this:
-- With CR we search for (a) good---searching for optimalilty is nearly always a mathematical deviation (disorder), based on too much playing with (believing in ) in toy models---hyper-parameter(s).
-- Once we found good hyperparameters we fit the model on all available data.
+- With CR we search for (a) good---searching for optimality is nearly always a mathematical deviation (disorder), based on too much playing with (believing in ) in toy models---hyper-parameter(s).
+- Once we found good hyper-parameters we fit the model on all available data.
+
+
+
+* Tree with weights
+** Levels of understanding
+1. I first built the tree in generic code with the formulas of DSML, but without the weights.
+2. Then I wanted to use AdaBoost with my own tree, rather than the one of ~sklearn~.
+3. AdaBoost involves trees with weights.
+4. Making a tree with weights required much more understanding than I initially thought
+6. Finally, I realized that we are dealing with a binary tree, so $Y_i\in \{-1, 1\}$, and there can be just left and right sub trees. With this, I could make the code a bit simpler.
+
+Here is my tree with weights.
+** Score functions
+
+As it turns out, the /description/ of the AdaBoost algorithm in DSML does not completely match the python /implementation/ of AdaBoost in DSML.
+The subtlety is that the description uses a zero-one training loss function to compute the impurity, i.e., similar to the misclassification impurity, while the ~DecisionTreeClassifier~ of ~sklearn~ uses the Gini impurity.
+To see how to align this, I had to rethink the entire procedure.
+It's an interesting challenge to try to do this yourself.
+Below is my explanation, so in case you want to derive things yourself, stop reading.
+
+To see how to generalize the computation of score functions with weights, it seems best to follow the steps of DSML, and then see how to include weights.
+
+Given $n$ data points, suppose we want to find a separator $s$ such that most points with label $-1$ are assigned to the left node $L$, and the points with label $1$ to the right node $R$.
+Then the misclassification score associated to $s$ via the sets $L$ and $R$ is  given by
+\begin{align}
+S(s) = \frac{1}{n}\sum_{i\in L} \1{Y_i \neq -1} +
+\frac{1}{n}\sum_{i\in E} \1{Y_i \neq 1}.
+\end{align}
+Clearly, we want to find $s^{*}$ such that this is minimized.
+Let us rewrite this problem into more general form, so that we can see how include weights.
+
+Define for some set $A$ of points, the proportion of points with label $z\in \{-1, 1\}$ as
+\begin{equation}
+p_{z}(A)= \frac{1}{|A|} \sum_{i\in A} \1{Y_i = z}.
+\end{equation}
+Suppose that label $1$ occurs most in set $A$, then
+\begin{equation}
+m(A) = \frac{1}{|A|} \sum_{i\in A}\1{Y_i \neq 1} = 1- \frac{1}{|A|} \sum_{i\in A}\1{Y_i = 1} = 1 - p_{1}(A)= 1-\max\{p_{-1}(A), p_{1}(A)\}.
+\end{equation}
+Clearly $m(A)$, called the /misclassification impurity/ of set $A$, does not depend on the class labels, but only on the set $A$!
+With the notion of misclassification impurity,  our objective of minimizing the score associated with a separator $s$ is the same as minimizing
+\begin{align}
+\label{eq:1}
+S(s) & = \frac{|L|}{n} \frac{1}{|L|}\sum_{i\in L} \1{Y_i \neq -1} +
+\frac{|R|}{n}\frac{1}{|R|}\sum_{i\in E} \1{Y_i \neq 1} \\
+&= \frac{|L|}{n} m(L) + \frac{|R|}{n} m(R).
+\end{align}
+
+Now observe that we replace the $m(L)$ and $m(R)$ by other impurity measures, for instance the Gini measure,
+\begin{equation}
+\label{eq:2}
+G(A) = \frac{1}{2} \left( 1 - p_{-1}(A)^{2} - p_{1}(A)^{2} \right),
+\end{equation}
+for a set $A$. In that case, we want to find an $s$, that induces sets $L$ and $R$ that minimize
+\begin{align}
+\label{eq:1}
+\frac{|L|}{n} G(L) + \frac{|R|}{n} G(R).
+\end{align}
+
+
+The next step is to include weights. Suppose we give weight $w_{i}$ to assigning point $i$ to the correct class. Then we generalize the proportion $p_{z}(A)$ to the /weighted proportion/
+\begin{equation}
+p_{z}(A, w) = \frac{\sum_{i\in A} w_{i}\1{Y_i = z}}{\sum_{i\in A} w_{i}}.
+\end{equation}
+By analogy, the weighted misclassification impurity for a set $A$ becomes
+\begin{equation}
+m(A, w) = 1-\max\{p_{-1}(A, w), p_{1}(A, w)\}.
+\end{equation} With this, the /weighted score/ of the separator $s$ that splits the set of data points into subsets $L$ and $R$ becomes
+\begin{equation}
+\label{eq:1}
+S(s) = m(L, w) \sum_{i\in L} w_{i}  + m(R, w)\sum_{i\in R} w_{i},
+\end{equation}
+where we assume that $w$ is such that $\sum_{i=1}^n w_i =1$.
+And finally, we can replace the impurity $m(L, w)$ by $G(L, w)$ (defined in terms of $p_{z}(A,w)$  by analogy) and likewise for $m(R, w)$.
+
+
 
 
 * Some examples of bad code ideas
 
-In the bagging code, from which I learned a lot btw, the author mixes the /contruction/ of a bag with the /testing/ of bags.  In my opinion that is a bad idea. These two parts of software should be split.
+In the bagging code, from which I learned a lot BTW, the author mixes the /construction/ of a bag with the /testing/ of bags. In my opinion that is a bad idea. These two parts of software should be split.
 
 * Exercises
 ** Exercise 1,on code
-- Read  [[https://www.geeksforgeeks.org/why-import-star-in-python-is-a-bad-idea/][here]] to understand why using ~import *~ is a very bad idea. Let me be honest: DSML use this style quite a bit. What annoys me slightly about the code in the DSML is that they have very different standards about how math should look like (impeccable), and how code should look like (a bit ugly, bad formating here and there). This is just as awkard in the other way around, correct code and wrong math.
+- Read  [[https://www.geeksforgeeks.org/why-import-star-in-python-is-a-bad-idea/][here]] to understand why using ~import *~ is a very bad idea. Let me be honest: DSML use this style quite a bit. What annoys me slightly about the code in the DSML is that they have very different standards about how math should look like (impeccable), and how code should look like (a bit ugly, bad formatting here and there). This is just as awkward in the other way around, correct code and wrong math.
 - Perhaps you like the explanations of this [[https://www.betterdatascience.com/mml-decision-trees/][site]].
   1. I like that the author uses classes. Of course I like my own ~Tree~ class better. (There is no reason to have ~Node~ class and a ~DecisionTree~ class.) However, beauty is in eye of the beholder, so study which of the two you like best.
   2. I also like that the author builds a ~fit~ method. The reason I don't do that is that this does not add much to the fundamental understanding algorithm, hence, adding a ~fit~ function adds `clutter'. (Besides we are never actually going to use these functions anyway; for real cases, we use the real thing, i.e., ~scikit~.)
   3. I don't like the documentation in between the code. It makes it hard to focus on (and locate)  the real code. That is one of the reasons I like the concept of /literate programming/ much more. In literate programming, Code and documentation are very clearly separated, which adds much to the understanding of the code, and the text.
 - You might also like to  check this [[https://www.betterdatascience.com/mml-random-forest/][site]]. There is a point of confusion: does the author call /random forest/ what we call /bagging/? I think so, but I haven't  studied the code  in detail, so I might be wrong.
-
-
-
-
-
-* Flappy bird and inventory control

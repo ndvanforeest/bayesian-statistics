@@ -4,5 +4,6 @@
 #+LATEX_HEADER: \usepackage{titlesec}
 #+LATEX_HEADER: \newcommand{\sectionbreak}{\clearpage}
 #+LATEX_HEADER: \newcommand{\subsectionbreak}{\clearpage}
+#+LATEX_HEADER: \newcommand{\subsubsectionbreak}{\clearpage}
 
 #+include: preamble_shared.org

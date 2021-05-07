@@ -1,7 +1,7 @@
 #+LaTeX_HEADER: \usepackage{mathtools,amsthm,amssymb,amsmath}
 
 #+LATEX_HEADER: \usepackage{minted}
-#+LATEX_HEADER: \setminted[python]{linenos=true,fontsize=\footnotesize,frame=lines}
+#+LATEX_HEADER: \setminted[python]{linenos=true,fontsize=\footnotesize,frame=lines,samepage}
 
 #+LaTeX_HEADER: \theoremstyle{definition}
 #+LaTeX_HEADER: \newtheorem{exercise}{Ex}[section]
@@ -23,7 +23,7 @@
 #+LaTeX_HEADER: \newcommand{\V}[1]{\,\mathsf{V}\left[#1\right]}
 #+LaTeX_HEADER: \newcommand{\VV}[2]{\,\mathsf{V}_{#1}\left[#2\right]}
 #+LaTeX_HEADER: \newcommand{\cov}[1]{\,\mathsf{Cov}\left[#1\right]}
-#+LaTeX_HEADER: \newcommand{\1}[1]{\,I_{#1}} % indicator
+#+LaTeX_HEADER: \newcommand{\1}[1]{\,1_{#1}} % indicator
 #+LaTeX_HEADER: \newcommand{\abs}[1]{\left\vert#1\right\vert}
 #+LaTeX_HEADER: \newcommand{\iid}{\ensuremath{\mathrm{iid.}\,}}
 #+LaTeX_HEADER: \newcommand{\nvf}[1]{\textbf{#1}}

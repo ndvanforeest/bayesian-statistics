@@ -1,25 +1,23 @@
 import numpy as np
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.datasets import make_blobs
-
-import sklearn as sk
-
-# import matplotlib.pyplot as plt
 
 
-def p(Y, w, z):
-    res = w[Y == z].sum()
-    if res == 0:
-        return 0
-    return res / w.sum()
+def p(Y, z):
+    return (Y == z).sum() / len(Y)
 
 
-def missclassify(Y, w):
-    return 1 - max(p(Y, w, -1), p(Y, w, 1))
+def missclassify(Y):
+    res = np.array([p(Y, z) for z in np.unique(Y)])
+    return 1 - res.max(initial=0)
 
 
-def gini(Y, w):
-    return 1 - p(Y, w, -1) ** 2 - p(Y, w, 1) ** 2
+def entropy(Y):
+    res = np.array([p(Y, z) for z in np.unique(Y)])
+    return -res @ np.log(res)
+
+
+def gini(Y):
+    res = np.array([p(Y, z) for z in np.unique(Y)])
+    return (1 - res @ res) / 2
 
 
 class Tree:
@@ -35,19 +33,18 @@ class Tree:
     def size(self):
         return len(self.Y)
 
-    def score(self, Y, w):
-        # return missclassify(Y)
-        return gini(Y, w)
+    def score(self, s):
+        return gini(self.Y[s])
 
     def score_of_split(self, i, j):
         s = self.X[:, j] <= self.X[i, j]
-        l_score = self.score(self.Y[s], self.w[s]) * self.w[s].sum() / self.w.sum()
-        r_score = self.score(self.Y[~s], self.w[~s]) * self.w[~s].sum() / self.w.sum()
+        l_score = self.score(s) * len(self.Y[s]) / len(self.Y)
+        r_score = self.score(~s) * len(self.Y[~s]) / len(self.Y)
         return l_score + r_score
 
     def find_optimal_split(self):
         n, p = self.X.shape
-        best_score = self.score(self.Y, self.w)
+        best_score = self.score([True] * len(self.Y))
         best_row = None
         best_col = None
         for j in range(p):
@@ -64,7 +61,7 @@ class Tree:
         if self.size() <= self.min_size or self.depth >= self.max_depth:
             return
         self.find_optimal_split()
-        if self.split_col == None:
+        if self.split_row == None:
             return
         s = self.X[:, self.split_col] <= self.split_value
         if s.all() or (~s).all():
@@ -74,20 +71,16 @@ class Tree:
         self.right = Tree(depth=self.depth + 1)
         self.right.fit(self.X[~s], self.Y[~s])
 
-    def fit(self, X, Y, sample_weight=None):
+    def fit(self, X, Y):
         self.X, self.Y = X, Y
-        if sample_weight is None:
-            sample_weight = np.ones(len(Y))
-        self.w = sample_weight / sample_weight.sum()
         self.split()
 
     def terminal(self):
         return self.left == None or self.right == None
 
     def majority_vote(self):
-        if p(self.Y, self.w, -1) >= p(self.Y, self.w, 1):
-            return -1
-        return 1
+        values, counts = np.unique(self.Y, return_counts=True)
+        return values[np.argmax(counts)]
 
     def _predict(self, x):
         if self.terminal():
@@ -126,47 +119,5 @@ def test():
     print(tree.predict(X))
 
 
-def test_2():
-    X = np.arange(5).reshape(5, 1)
-    Y = np.array([1, 0, 0, 1, 1])
-    Y = 2 * Y - 1
-    n, p = X.shape
-    w = np.ones(n)
-    w[0] = 100
-    w /= w.sum()
-
-    tree = Tree()
-    tree.fit(X, Y, sample_weight=w)
-    my_y = tree.predict(X)
-
-    clf = DecisionTreeClassifier(max_depth=1)
-    clf.fit(X, Y, sample_weight=w)
-    their_y = clf.predict(X)
-    print((my_y == their_y).all())
-    # print(clf.tree_.feature[0], clf.tree_.threshold[0], clf.tree_.impurity)
-    # sk.tree.plot_tree(clf)
-    # plt.show()
-
-
-def test_3():
-    np.random.seed(4)
-    X, Y = make_blobs(n_samples=13, n_features=3, centers=2, cluster_std=20)
-    Y = 2 * Y - 1
-    n, p = X.shape
-    w = np.random.uniform(size=n)
-    w /= w.sum()
-
-    tree = Tree()
-    tree.fit(X, Y, sample_weight=w)
-    my_y = tree.predict(X)
-
-    clf = DecisionTreeClassifier(max_depth=1)
-    clf.fit(X, Y, sample_weight=w)
-    their_y = clf.predict(X)
-    print((my_y == their_y).all())
-
-
 if __name__ == "__main__":
-    # test()
-    # test_2()
-    test_3()
+    test()
