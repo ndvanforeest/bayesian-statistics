@@ -20,8 +20,8 @@ class RandomForest(Bag):
             bootstrap = rng.integers(low=0, high=n, size=n)
             X, Y = self.X[bootstrap], self.Y[bootstrap]
             features = rng.choice(range(p), size=self.n_features, replace=False)
-            tree = Tree(X[:, features], Y)
-            tree.split()
+            tree = Tree()
+            tree.fit(X[:, features], Y)
             self.trees.append(tree)
 
 def test():
@@ -43,11 +43,12 @@ def test():
 
     RandomForest.max_depth = 2
     RandomForest.min_size = 1
-    rf = RandomForest(X, Y, n_trees=50, n_features=1)
+    rf = RandomForest(X, Y, n_trees=51, n_features=1)
     rf.make_trees()
 
-    tests = [[3, 10], [4, -5], [6, 1], [7, 2], [8, 5]]
+    tests = [[1, 10], [4, -5], [6, 1], [7, 2], [8, 5]]
     for x in tests:
+        x = np.array(x).reshape(1,2)
         print(f"Predicted class of {x}: {rf.predict(x)}")
 
 if __name__ == "__main__":

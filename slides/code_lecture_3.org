@@ -32,26 +32,26 @@ C-u C-u C-c C-x C-l to preview all
 
 * Overview
 - Last lecture
-  - Examples of bad code, and how to repair
   - Gradient descent
   - Kernel methods
-- This lecture focusses on optimization
+  - Examples of bad code, and how to repair
+- This lecture focuses on optimization
   - LP solvers and graphs
   - ridge regression
   - lasso
 - Next lecture:
-  - Recurion
-  - Decision trees
+  - Recursion
+  - Decision trees (which are implemented with recursion)
 
-Recall, the goal of this lecture (and set of handouts) is to provide you with working code and explain how the code works.
+Recall, the goal of the code lectures (and the set of handouts) is to explain how the toolboxes work and to provide you with working code so that you can see yourself how all works.
 
 * LP (~Pulp~) and graphs (~networkx~)
 
 ** Intro and motivation
- From the theory lectures and DSML you learned that Lasso can only be solved with optimization tools; there are not closed-form solutions to get the $\beta$ directly.
-As a second ingredient you should know that graphs are used to visualize and analyze certains types of data, for instance facebook networks, or genes. Hence, it doesn't hurt for you to see how we can combine optimization and networks to analyze a scheduling problem.
+ From the theory lectures and DSML you learned that Lasso can only be solved with optimization tools; there are no closed-form solutions to get the $\beta$ directly.
+As a second ingredient for this lecture, you should know that graphs are used to visualize and analyze certain types of data, for instance Facebook networks, or genes. Hence, it doesn't hurt to see how we can combine optimization and networks to analyze a scheduling problem.
 
-First I will discuss the scheduling problem, then develop the code to analyze it. I find the tools really neat. We will show how to use classes to deal with graphs and optimization problems on a conceptual level. When we come to dicussing lasso, you'll see that there are many common points.
+First I will discuss the scheduling problem, then develop the code to analyze it. I find the tools really neat. We will show how to use classes to deal with graphs and optimization problems on a conceptual level. When we come to discussing lasso, you'll see that there are many common points.
 
 ** Needed software
 
@@ -73,7 +73,7 @@ Each task has a duration. Tasks can have predecessor tasks; a predecessor is a t
 
 We implement this as a graph. Each node corresponds to a task, each edge to a duration and a predecessor relation.
 
-Here is an example. (I use the ~graphviz~ libary to plot the graph.) The nodes ~U~ and ~V~ correspond to the start and finish of the project.
+Here is an example. (I use the ~graphviz~ library to plot the graph.) The nodes ~U~ and ~V~ correspond to the start and finish of the project.
 
 #+BEGIN_SRC dot :file figures/test-dot.pdf :exports both
 digraph{
@@ -183,7 +183,7 @@ cpm.add_node("Cmax", p=0)
 cpm.add_edges_from([(j, "Cmax") for j in cpm.nodes()])
 #+end_src
 
-Remark: I built the above by hand. For real projects, such information is stored in a database, and then we use computer programms to build the graphs.
+Remark: I built the above by hand. For real projects, such information is stored in a database, and then we use computer programs to build the graphs.
 
 
 ** Solving for the makespan
@@ -191,7 +191,7 @@ Remark: I built the above by hand. For real projects, such information is stored
 
 Now that we have graph, we want to compute the completion time of ~Cmax~. For this we model the problem as an LP.
 
-We begin with loading ~pulp~, a python library to solve LPs. Then we create a problem, to which we add decision variables, contrainsts, and an objective.
+We begin with loading ~pulp~, a python library to solve LPs. Then we create a problem, to which we add decision variables, constraints, and an objective.
 
 #+name:problem
 #+begin_src python :session :results none :exports both
@@ -234,7 +234,7 @@ for j in cpm.nodes():
     for i in cpm. predecessors(j):
         prob += s[j] >= s[i] + cpm.nodes[i]['p']
 #+end_src
-Observe here we that the ~DiGraph~ class of ~networkx~ provides us with a function to compute the predessorcs. We get it for free!
+Observe here we that the ~DiGraph~ class of ~networkx~ provides us with a function to compute the predecessors. We get it for free!
 
 
 Finally, a job's completion time must be larger than the completion times of each of its predecessors plus its own processing time:
@@ -248,13 +248,13 @@ for j in cpm.nodes():
     for i in cpm. predecessors(j):
         prob += c[j]  >= c[i] + cpm.nodes[j]['p']
 #+end_src
-Observe that the constraint $C_{\max} \geq c_j$ is automaticaly included by these constraints, as `Cmax` is a node in the project graph.
+Observe that the constraint $C_{\max} \geq c_j$ is automatically included by these constraints, as `Cmax` is a node in the project graph.
 
 
 The objective function is such that the makespan is minimized and,  simultaneously, that the earliest starting times are minimized and latest completion times are maximized.
 With this we can find the slack of task $j$ as $c_j-s_j - p_{j}$. Knowing the slack is important: any job with zero slack is /tight/, which means that it's on the /critical path/. Any detail on a tight job will result in a delay of the entire project. Hence, it's essential to manage the tight jobs well, so as to prevent delay.
 
-We thereforex define the objective function as
+We therefore define the objective function as
 \begin{align*}
    \min\left\{ C_{max} + \epsilon \sum_{j=1}^n s_j - \epsilon \sum_{j=1}^n c_j \right\},
 \end{align*}
@@ -307,7 +307,7 @@ The project completion time is $56$ time units.
 Observe how ~networkx~ helps us to model and solve this scheduling problem on a conceptual level. We have to do astonishingly little ourselves, we can fully concentrate on getting the model correct and on the solution itself, and we don't have to be concerned with any  tough (numerical) algorithm.
 
 To show you how little real code we actually need, check ~cpm.py~ on ~github~.
-This is actuall what I would normally program; for me, there is much need for documentation, as the code tells me what is going on.
+This is actually what I would normally program; for me, there is much need for documentation, as the code tells me what is going on.
 Of course I need code to enter the data, such as the nodes, task durations and predecessors, and I need code to process the results. These parts of the code can be pretty big at times, BTW. However, as you can see, the engine itself is very short and conceptually clear.
 
 
@@ -347,7 +347,7 @@ Of course I need code to enter the data, such as the nodes, task durations and p
 
 * OLS
 
-Now I want to demonstrate how to solve OLS with the optimization library ~CVXPY~. I don't want to use ~sklearn~ directly, although that would be natural since we are dealing with a data analysis problem. However,  ~CVXPY~ is a generic tool, a tool we  can use for many other optimization tools, such as portfolio optimazation, inventory control, and so on. So, we learn one tool, but get lots of offspin.
+Now I want to demonstrate how to solve OLS with the optimization library ~CVXPY~. I don't want to use ~sklearn~ directly, although that would be natural since we are dealing with a data analysis problem. However,  ~CVXPY~ is a generic tool, a tool we  can use for many other optimization tools, such as portfolio optimization, inventory control, and so on. So, we learn one tool, but get lots of off-spin.
 
 Below I will use  ~CVXPY~ to deal with lasso, but before trying such a tool on new problems, I prefer to see how it works  on things I can check. Hence, let's tackle OLS first.
 
@@ -370,7 +370,7 @@ import matplotlib.pyplot as plt
 ** A common API
 
 Below I'll build several predictors: OLS, ridge, lasso.
-These predictors have some common functionality, which I therefore put in a base class. In particular, I want the predictors to have a similar interface, called an API (Application programming interface). Why is this a good idea? Well, in the first place, it becomes possible to reuse things we learned. We have to learn once to call ~solve~, and then it works the same for the rest. Second, we can test the method of a parrent class separately. If it works, it will also work for all the derived classes. Hence, we gain in softwae reliablity. We only have to ensure to do it right once. In python this is called the /DRY/ concept: Don't Repeat Yourself. Applying this concept makes you a much better programmer. Third , it makes it easier to replace one type of regressor by another. They all interact in the same way with `the rest of the world'.
+These predictors have some common functionality, which I therefore put in a base class. In particular, I want the predictors to have a similar interface, called an API (Application programming interface). Why is this a good idea? Well, in the first place, it becomes possible to reuse things we learned. We have to learn once to call ~solve~, and then it works the same for the rest. Second, we can test the method of a parent class separately. If it works, it will also work for all the derived classes. Hence, we gain in software reliability. We only have to ensure to do it right once. In python this is called the /DRY/ concept: Don't Repeat Yourself. Applying this concept makes you a much better programmer. Third , it makes it easier to replace one type of regressor by another. They all interact in the same way with `the rest of the world'.
 
 
 I'll derive a class for OLS, ridge regression and Lasso from the ~Preditor~ class.
@@ -400,7 +400,7 @@ class Predictor:
 The ~solve~ method has to be implemented in the derived class.
 
 ** Regular OLS
-With the ~Predictor~ class, the implemention of an ~OLS~ class is very short. I just have to build the ~solve~ method; the rest can be inherited.
+With the ~Predictor~ class, the implementation of an ~OLS~ class is very short. I just have to build the ~solve~ method; the rest can be inherited.
 
 
 #+name: ols
@@ -438,14 +438,15 @@ class OLS_convex(Predictor):
         self.beta = np.array(beta.value)
 #+end_src
 
-I include an ~objective~ method, because the rigde and lasso regressors will follow the same pattern. Again, note that it suffices to build a ~solve~ method.
+I include an ~objective~ method, because the ridge and lasso regressors will follow the same pattern. Again, note that it suffices to build a ~solve~ method.
 
 ** A test
 
-Since classes definitions themselves are also objects, we can pass them to test functions, such as I do below.
-(Here is a subtle point. A class is a type, and not the same as an instance or object of a class. An instance of a class holds actual data within it, whereas a type is merely a template that specifies how its instances should behave. When we write ~x = Foo()~, we say ~x~ is an object or instance of type ~Foo~.
+Since class definitions themselves are also objects, we can pass them to test functions, such as I do below.
 
-To add to the confusion, ~Foo~ is both a type and an object. That is because ~Foo~ is an instance of the type ~type~ - but not of type ~Foo~. Understanding the distinction between objects and types is paramount in furthering your programming skills. I admit, it takes some time to understand, but once you do, you will write better code, with less mistakes, and you can yet more adhere to the DRY concept.)
+Here is a subtle point. A class is a type, and not the same as an instance or object of a class. An instance of a class holds actual data within it, whereas a type is merely a template that specifies how its instances should behave. When we write ~x = Foo()~, we say ~x~ is an object or instance of type ~Foo~.
+
+To add to the confusion, ~Foo~ is both a type and an object. That is because ~Foo~ is an instance of the type ~type~ - but not of type ~Foo~. Understanding the distinction between objects and types is paramount in furthering your programming skills. I admit, it takes some time to understand, but once you do, you will write better code, with less mistakes, and you can yet more adhere to the DRY concept.
 
 #+name: ols_test
 #+begin_src python :session :results none :exports code
@@ -508,7 +509,7 @@ if __name__== "__main__":
 * Ridge regression
 
 ** Regular Ridge regression
-I first build rigde regression as explained in DSML.6.2; this method is  direct, i.e., it solves a problem of the form $A x = b$.
+I first build ridge regression as explained in DSML.6.2; this method is  direct, i.e., it solves a problem of the form $A x = b$.
 If you have read the relevant parts,  the code below is evident.
 
 #+name: ridge
@@ -634,7 +635,7 @@ statistics_plotting(Ridge_convex)
 Since you like econometrics, explain this graph!
 
 
-And a plot of how the sizes of $\beta$ vary as a function of $\gamma.
+And a plot of how the sizes of $\beta$ vary as a function of $\gamma$.
 
 #+begin_src python :session :results file :exports results
 "figures/Ridge_convex_betas.pdf"
@@ -665,7 +666,7 @@ class Ridge_with_constant(Predictor):
 #+end_src
 
 
-* Lasso regession
+* Lasso regression
 
 There is not direct method to find the minimum in the objective for lasso; we have to use a tool like CVXPY. I borrowed some ideas from [[https://www.cvxpy.org/examples/machine_learning/lasso_regression.html][cvxpy.lasso]].
 
@@ -680,7 +681,7 @@ class Lasso(Ridge_convex):
         return cp.norm1(beta)
 #+end_src
 
-Here is some  advice: think hard about how I organized the code, and compare my code with that of the ~CVXPY~ site.  Hopefully you can see how much work I have been able to suppress by defining good classes. In more general terms, I applied a concept called /abstraction/. I focussed on  aspects that all predictors have in common. This I put in the ~Predictor~ class. Then I checked what ridge regression and lasso have in common. As it turns out, quite a lot. That is why the implementation of the lasso class is so small: most of the work is covered in ~Ridge_convex~.
+Here is some  advice: think hard about how I organized the code, and compare my code with that of the ~CVXPY~ site.  Hopefully you can see how much work I have been able to suppress by defining good classes. In more general terms, I applied a concept called /abstraction/. I focused on  aspects that all predictors have in common. This I put in the ~Predictor~ class. Then I checked what ridge regression and lasso have in common. As it turns out, quite a lot. That is why the implementation of the lasso class is so small: most of the work is covered in ~Ridge_convex~.
 
 ** Graphs
 
@@ -751,12 +752,12 @@ if __name__ == "__main__":
 ** Coding
 
 - Defining a good class hierarchy---finding a good level of /abstration/---can save you a lot of typing. Moreover, it helps to understand code much better. Finally, we can reuse lots of code. Hence, we only have to test code once. All classes that derive from a parent class benefit from this.
-- Good python librarie share ideas of the  API. For instance, in  ~pulp and ~CVXPY~ we define a problem, and we can call the ~solve~ method for both. Similar names and APIs make code better understandable, and easier to memorize.
+- Good python libraries share ideas of the  API. For instance, in  ~pulp and ~CVXPY~ we define a problem, and we can call the ~solve~ method for both. Similar names and APIs make code better understandable, and easier to memorize.
 - Avoid (to the extent possible) to learn ten different tools, each with their own quirks, such as  AIMS for LPs, Stata (?) for data analysis, yet other tools for convex optimization, and so on. Using many different tools makes you less efficient, and you'll make more mistakes.
 - Realize, later in life you don't get paid to use AIMS (or whatever other tools); you get paid to get a job done. So, any time spent on learning ten different tools is (basically) wasted. Your customer will not pay for it, so it's  time of yourself not spent on Sunday picnics.
 
 For me:
-- I prefer to be lazy and let the computer solve my problems.  So, if I have to do something tedious, I often try to develop on an algorithm (an intellecual  challenge) and  pass the execution of the job (very boring and time consuming) to the computer.
+- I prefer to be lazy and let the computer solve my problems.  So, if I have to do something tedious, I often try to develop on an algorithm (an intellectual  challenge) and  pass the execution of the job (very boring and time consuming) to the computer.
 - However,  in general I find most (nearly all?) computer tools extremely boring, so the less time I  have to invest in learning such things, the better. In other terms, I am not a computer scientist or programmer;  I am not interested in seeing how  ten different computer tools work. I find it boring, and prefer to spend my time on other things.
 
 Best advice: Do as I do :-)
@@ -780,14 +781,14 @@ Read/Browse the web/documentation of the following topics (Just spend a few minu
 
 ** Exercise 2
 
-Can you extend the implemention of  lasso to /Fused Lasso/? The objective for fused lasso is this:
+Can you extend the implementation of  lasso to /Fused Lasso/? The objective for fused lasso is this:
 \begin{equation}
 \label{eq:1}
 ||Y-X \beta||_2 + \lambda_1 ||\beta||_1 + \lambda_2 \sum_{i=2}^p |\beta_j-\beta_{j-1}|,
 \end{equation}
 where $||\cdot||_{2}$ is the 2-norm, and $||\cdot||_{1}$ the 1-norm. Check out Wikipedia if you don't know what I mean by this. It's important to know, as these types of norm are also used by ~numpy~, ~CVXPY~, and other numerical toolboxes.
 
-I haven't tried this, nor tested it. I have no idea whether this additional regulazation term works or not. In all honesty (and naive no doubt), I don't see much value in such tweaks. Why would one want to regularize the difference between successive terms of $\beta$? Take $\lambda_{1}$ big, then  $||\beta||$ will be small anyway, so $\beta_j-\beta_{j-1}$ must also be small. Second, why would I care about $\beta_{1}$ being big, and $\beta_2$ small?  If this matter, it must say something about the first and second column of $X$. But why would there be any particular order in the features?
+I haven't tried this, nor tested it. I have no idea whether this additional regularization term works or not. In all honesty (and naive no doubt), I don't see much value in such tweaks. Why would one want to regularize the difference between successive terms of $\beta$? Take $\lambda_{1}$ big, then  $||\beta||$ will be small anyway, so $\beta_j-\beta_{j-1}$ must also be small. Second, why would I care about $\beta_{1}$ being big, and $\beta_2$ small?  If this matters, it must say something about the first and second column of $X$. But why would there be any particular order in the features?
 
 As a general rule: in my own experience, tweaks seldom work.
 They are not based on fundamental insights (such as regulation which ridge and lasso already capture).

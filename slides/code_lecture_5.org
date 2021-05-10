@@ -87,8 +87,8 @@ def make_trees(self):
     for _ in range(self.n_trees):
         bootstrap = rng.integers(low=0, high=n, size=n)
         X, Y = self.X[bootstrap], self.Y[bootstrap]
-        tree = Tree(X, Y)
-        tree.split()
+        tree = Tree()
+        tree.fit(X, Y)
         self.trees.append(tree)
 #+end_src
 
@@ -101,13 +101,16 @@ Finally, ~predict~ is just a convenience function that call the ~majority_vote~ 
 #+name: predict
 #+begin_src python :results none :exports code
 def majority_vote(self, x):
-    predictions = [t.predict(x) for t in self.trees]
-    values, counts = np.unique(predictions, return_counts=True)
-    return values[np.argmax(counts)]
+    predictions = np.array([t.predict(x) for t in self.trees])
+    return np.sign(predictions.sum(axis=0))
+    # values, counts = np.unique(predictions, return_counts=True)
+    #return values[np.argmax(counts)]
 
 def predict(self, x):
     return self.majority_vote(x)
 #+end_src
+
+For this trick to work, ensure that the number of trees is odd.
 
 
 ** A test
@@ -133,11 +136,13 @@ def test():
 
     Bag.max_depth = 2
     Bag.min_size = 1
-    bag = Bag(X, Y, n_trees=50)
+    bag = Bag(X, Y, n_trees=5)
     bag.make_trees()
+    print(bag.predict(X))
 
     tests = [[3, 10], [4, -5], [6, 1], [7, 2], [8, 5]]
     for x in tests:
+        x = np.array(x).reshape(1, 2)
         print(f"Predicted class of {x}: {bag.predict(x)}")
 #+end_src
 
@@ -219,8 +224,8 @@ def make_trees(self):
         bootstrap = rng.integers(low=0, high=n, size=n)
         X, Y = self.X[bootstrap], self.Y[bootstrap]
         features = rng.choice(range(p), size=self.n_features, replace=False)
-        tree = Tree(X[:, features], Y)
-        tree.split()
+        tree = Tree()
+        tree.fit(X[:, features], Y)
         self.trees.append(tree)
 #+end_src
 
@@ -247,11 +252,12 @@ def test():
 
     RandomForest.max_depth = 2
     RandomForest.min_size = 1
-    rf = RandomForest(X, Y, n_trees=50, n_features=1)
+    rf = RandomForest(X, Y, n_trees=51, n_features=1)
     rf.make_trees()
 
-    tests = [[3, 10], [4, -5], [6, 1], [7, 2], [8, 5]]
+    tests = [[1, 10], [4, -5], [6, 1], [7, 2], [8, 5]]
     for x in tests:
+        x = np.array(x).reshape(1,2)
         print(f"Predicted class of {x}: {rf.predict(x)}")
 #+end_src
 
@@ -279,7 +285,41 @@ if __name__ == "__main__":
 - Bias: bias decreases as a function of model complexity
 - Variance: variance increases as a function of model complexity, as model becomes more sensitive to the data chosen/used
 
+#+begin_src python :session :results output :exports both
+import numpy as np
+import numpy.linalg as LA
+import pandas as pd
 
+df = pd.read_csv("data_by_year_o.csv")
+
+X = df[["tempo"]].values
+Y = df["popularity"].values
+
+
+xx = X  # keep for plotting
+X = np.c_[np.ones(len(Y)), X]  # put 1 in front
+
+n, p = X.shape
+
+K = 100
+
+loss = []
+for k in range(1, K + 1):
+    # integer indices of test samples
+    test_ind = ((n / K) * (k - 1) + np.arange(1, n / K + 1) - 1).astype('int')
+    train_ind = np.setdiff1d(np.arange(n), test_ind)
+    # print(test_ind)
+    # quit()
+    # print(train_ind)
+
+    X_train, y_train = X[train_ind, :], Y[train_ind]
+    X_test, y_test = X[test_ind, :], Y[test_ind]
+
+    betahat = LA.solve(X_train.T @ X_train, X_train.T @ y_train)
+    loss.append(LA.norm(y_test - X_test @ betahat) ** 2)
+
+print(sum(loss) / n)
+#+end_src
 ** LOOCV ?
 
 Include some silly code. That is what happens if you only learn to use standard libraries. You will not develop the algorithmic skills that you will need in your job (even cleaning data requires algorithms, and there are no general libraries to help clean data, as it is data(format) dependent.)
