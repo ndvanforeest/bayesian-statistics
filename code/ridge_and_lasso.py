@@ -5,9 +5,6 @@ import matplotlib.pyplot as plt
 from ols import Predictor, test
 
 class Ridge(Predictor):
-    def loss(self, X, Y, beta):
-        return np.square(Y - beta @ X).sum()
-
     def solve(self):
         n, p = self.X.shape
         A = self.X.T @ self.X + self.gamma * np.eye(p)
@@ -15,10 +12,9 @@ class Ridge(Predictor):
         self.beta = LA.solve(A, b)
 
 
-
 class Ridge_convex(Predictor):
     def loss(self, X, Y, beta):
-        return cp.pnorm(X @ beta - Y, p=2) ** 2
+        return cp.pnorm(Y - X @ beta, p=2) ** 2
 
     def regularizer(self, beta):
         return cp.pnorm(beta, p=2) ** 2
@@ -96,6 +92,7 @@ def statistics_plotting(method):
     plt.title("Regularization Path")
     fname = "figures/" + algo.__class__.__name__ + "_betas.pdf"
     plt.savefig(fname)
+
 
 if __name__ == "__main__":
     test(Ridge)

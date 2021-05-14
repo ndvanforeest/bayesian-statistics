@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as LA
-import pandas as pd
+ import pandas as pd
 
 df = pd.read_csv("data_by_year_o.csv")
 
@@ -14,6 +14,11 @@ X = np.c_[np.ones(len(Y)), X]  # put 1 in front
 n, p = X.shape
 
 K = 100
+
+# check on size of K
+if K>n:
+    print("K is too large, i.e., K should not exceed the number n of data points.")
+    exit(1)
 
 loss = []
 for k in range(1, K + 1):

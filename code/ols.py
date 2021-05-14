@@ -12,13 +12,13 @@ class Predictor:
         self.beta_0 = 0
 
     def loss(self, X, Y, beta):
-        raise NotImplemented
+        return np.square(Y - X @ beta).sum()
 
     def solve(self):
         raise NotImplemented
 
     def predict(self, x):
-        return self.beta_0 + self.beta @ x
+        return self.beta_0 + x @ self.beta
 
     def mse(self, X, Y):
         n, p = X.shape
@@ -26,9 +26,6 @@ class Predictor:
 
 
 class OLS(Predictor):
-    def loss(self, X, Y, beta):
-        return np.square(Y - beta @ X).sum()
-
     def solve(self):
         self.beta = LA.solve(self.X.T @ self.X, self.X.T @ self.Y)
 
@@ -66,6 +63,27 @@ def test(method):
     print(algo.beta[0])
 
 
+def test_2(method):
+    np.random.seed(3)
+
+    n, p = 50, 20
+    sigma = 5
+
+    beta_star = np.ones(p)
+    beta_star[:10] = np.zeros(10)
+
+    X = np.random.randn(n, p)
+    Y = X @ beta_star + np.random.normal(0, sigma, size=n)
+
+    algo = method(X, Y, gamma=1)
+    algo.solve()
+
+    X = np.random.randn(2, p)
+    print(algo.predict(X))
+
+
 if __name__== "__main__":
     test(OLS)
     test(OLS_convex)
+    test_2(OLS)
+    test_2(OLS_convex)

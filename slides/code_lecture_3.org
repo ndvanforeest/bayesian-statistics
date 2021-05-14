@@ -56,9 +56,9 @@ First I will discuss the scheduling problem, then develop the code to analyze it
 ** Needed software
 
 We will need:
-- ~graphviz~ to visualize the project graph
-- ~pulp~, a python library, to solve the LP that results from optimizing the project plan. The API of ~pulp~ is very similar to that of the optimization library (~CVXPY~), which we will use to tackle the optimization problem involved in lasso.
+- ~graphviz~, a piece of software to visualize graphs
 - ~networkx~, a python library, to handle (very) large graphs.
+- ~pulp~, a python library, to solve the LP that results from optimizing the project plan. The API of ~pulp~ is very similar to that of the optimization library (~CVXPY~), which we will use to tackle the optimization problem involved in lasso.
 
 I installed the software with ~pip~.
 #+begin_src shell :results none :exports code
@@ -231,7 +231,7 @@ where we write $i\to j$ to mean that job $i$ precedes job $j$.
 #+name: start
 #+begin_src python :session :results none :exports both
 for j in cpm.nodes():
-    for i in cpm. predecessors(j):
+    for i in cpm.predecessors(j):
         prob += s[j] >= s[i] + cpm.nodes[i]['p']
 #+end_src
 Observe here we that the ~DiGraph~ class of ~networkx~ provides us with a function to compute the predecessors. We get it for free!
@@ -245,7 +245,7 @@ Finally, a job's completion time must be larger than the completion times of eac
 #+name: completion
 #+begin_src python :session :results none :exports both
 for j in cpm.nodes():
-    for i in cpm. predecessors(j):
+    for i in cpm.predecessors(j):
         prob += c[j]  >= c[i] + cpm.nodes[j]['p']
 #+end_src
 Observe that the constraint $C_{\max} \geq c_j$ is automatically included by these constraints, as `Cmax` is a node in the project graph.
@@ -274,7 +274,7 @@ Solving is now very simple. We can just call ~solve~ to have the LP built, and s
 
 #+name: solve
 #+begin_src python :session :results none :exports both
-prob.writeLP("cpmLP.lp")
+# prob.writeLP("cpmLP.lp")
 prob.solve()
 pulp.LpStatus[prob.status]
 #+end_src
@@ -307,7 +307,7 @@ The project completion time is $56$ time units.
 Observe how ~networkx~ helps us to model and solve this scheduling problem on a conceptual level. We have to do astonishingly little ourselves, we can fully concentrate on getting the model correct and on the solution itself, and we don't have to be concerned with any  tough (numerical) algorithm.
 
 To show you how little real code we actually need, check ~cpm.py~ on ~github~.
-This is actually what I would normally program; for me, there is much need for documentation, as the code tells me what is going on.
+This is actually what I would normally program; for me, there is not much need for documentation, as the code tells me what is going on.
 Of course I need code to enter the data, such as the nodes, task durations and predecessors, and I need code to process the results. These parts of the code can be pretty big at times, BTW. However, as you can see, the engine itself is very short and conceptually clear.
 
 
@@ -385,13 +385,13 @@ class Predictor:
         self.beta_0 = 0
 
     def loss(self, X, Y, beta):
-        raise NotImplemented
+        return np.square(Y - X @ beta).sum()
 
     def solve(self):
         raise NotImplemented
 
     def predict(self, x):
-        return self.beta_0 + self.beta @ x
+        return self.beta_0 + x @ self.beta
 
     def mse(self, X, Y):
         n, p = X.shape
@@ -406,9 +406,6 @@ With the ~Predictor~ class, the implementation of an ~OLS~ class is very short. 
 #+name: ols
 #+begin_src python :session :results none :exports code
 class OLS(Predictor):
-    def loss(self, X, Y, beta):
-        return np.square(Y - beta @ X).sum()
-
     def solve(self):
         self.beta = LA.solve(self.X.T @ self.X, self.X.T @ self.Y)
 #+end_src
@@ -478,6 +475,35 @@ test(OLS_convex)
 : 0.7362515517803384
 
 
+#+name: ols_test_predict
+#+begin_src python :session :results none :exports code
+def test_2(method):
+    np.random.seed(3)
+
+    n, p = 50, 20
+    sigma = 5
+
+    beta_star = np.ones(p)
+    beta_star[:10] = np.zeros(10)
+
+    X = np.random.randn(n, p)
+    Y = X @ beta_star + np.random.normal(0, sigma, size=n)
+
+    algo = method(X, Y, gamma=1)
+    algo.solve()
+
+    X = np.random.randn(2, p)
+    print(algo.predict(X))
+#+end_src
+
+
+#+begin_src python :session :results output :exports both
+test_2(OLS)
+test_2(OLS_convex)
+#+end_src
+
+
+
 Note that I compare  my `new' tool ~CVXPY~ against my `old' tool ~numpy.linalg.solve~.
 Perhaps you find me a bit over cautious, but from experience I can tell you that if you forget (or are too lazy) to do such steps, you can be confronted with very awkward surprises.
 Such intermediate checks help to locate mistakes that I might make later.
@@ -501,9 +527,14 @@ In case errors occur later, it's unlikely I have to search for the problem in th
 <<ols_test>>
 
 
+<<ols_test_predict>>
+
+
 if __name__== "__main__":
     test(OLS)
     test(OLS_convex)
+    test_2(OLS)
+    test_2(OLS_convex)
 #+end_src
 
 * Ridge regression
@@ -515,15 +546,11 @@ If you have read the relevant parts,  the code below is evident.
 #+name: ridge
 #+begin_src python :session :results none  :exports code
 class Ridge(Predictor):
-    def loss(self, X, Y, beta):
-        return np.square(Y - beta @ X).sum()
-
     def solve(self):
         n, p = self.X.shape
         A = self.X.T @ self.X + self.gamma * np.eye(p)
         b = self.X.T @ self.Y
         self.beta = LA.solve(A, b)
-
 #+end_src
 
 ** Ridge regression with CVXPY
@@ -534,7 +561,7 @@ I adapted the code I found here: [[https://www.cvxpy.org/examples/machine_learni
 #+begin_src python :session :results none  :exports code
 class Ridge_convex(Predictor):
     def loss(self, X, Y, beta):
-        return cp.pnorm(X @ beta - Y, p=2) ** 2
+        return cp.pnorm(Y - X @ beta, p=2) ** 2
 
     def regularizer(self, beta):
         return cp.pnorm(beta, p=2) ** 2
@@ -550,7 +577,7 @@ class Ridge_convex(Predictor):
         problem.solve(solver="SCS")
         self.beta = np.array(beta.value)
 #+end_src
-I got some warnings with the standard solver ~ECOS~. A search on ~cvxpy warning~ helped me resolve this.
+I got some warnings with the standard solver ~ECOS~. A search on ~cvxpy warning~ helped me resolve this: I called the solver ~SCS~ instead of ~ECOS~. (I don't know about the differences; I just replaced one string for another.)
 
 
 ** A test
@@ -752,13 +779,14 @@ if __name__ == "__main__":
 ** Coding
 
 - Defining a good class hierarchy---finding a good level of /abstration/---can save you a lot of typing. Moreover, it helps to understand code much better. Finally, we can reuse lots of code. Hence, we only have to test code once. All classes that derive from a parent class benefit from this.
-- Good python libraries share ideas of the  API. For instance, in  ~pulp and ~CVXPY~ we define a problem, and we can call the ~solve~ method for both. Similar names and APIs make code better understandable, and easier to memorize.
+- Good python libraries share ideas of the  API. For instance, in  ~pulp~ and ~CVXPY~ we define a problem, and we can call the ~solve~ method for both. Similar names and APIs make code better understandable, and easier to memorize.
 - Avoid (to the extent possible) to learn ten different tools, each with their own quirks, such as  AIMS for LPs, Stata (?) for data analysis, yet other tools for convex optimization, and so on. Using many different tools makes you less efficient, and you'll make more mistakes.
 - Realize, later in life you don't get paid to use AIMS (or whatever other tools); you get paid to get a job done. So, any time spent on learning ten different tools is (basically) wasted. Your customer will not pay for it, so it's  time of yourself not spent on Sunday picnics.
 
 For me:
 - I prefer to be lazy and let the computer solve my problems.  So, if I have to do something tedious, I often try to develop on an algorithm (an intellectual  challenge) and  pass the execution of the job (very boring and time consuming) to the computer.
-- However,  in general I find most (nearly all?) computer tools extremely boring, so the less time I  have to invest in learning such things, the better. In other terms, I am not a computer scientist or programmer;  I am not interested in seeing how  ten different computer tools work. I find it boring, and prefer to spend my time on other things.
+- However,  in general I find most (nearly all?) computer things dull, so the less time I  have to invest in learning such things, the better. In other terms, I am not a computer scientist or programmer;  I am not interested in seeing how  ten different computer tools for the same job work.
+
 
 Best advice: Do as I do :-)
 
@@ -780,6 +808,11 @@ Read/Browse the web/documentation of the following topics (Just spend a few minu
   - https://xavierbourretsicotte.github.io/ridge_lasso_visual.html
 
 ** Exercise 2
+The method ~mse~ in the ~Predictor~ class cannot be applied to my implementation of OLS. Why not? (Hence, the implementation of the ~Predictor~ contains a bug.) Can you repair this?
+
+Hint: the mistake is ~value~ attribute.
+
+** Exercise 3
 
 Can you extend the implementation of  lasso to /Fused Lasso/? The objective for fused lasso is this:
 \begin{equation}
@@ -801,5 +834,5 @@ I can be completely wrong here. Nobody knows the answer here :-)
 
 
 
-** Exercise 3
+** Exercise 4
 Redo the lasso problem above with ~sklearn~.

@@ -59,11 +59,11 @@ for j in cpm.nodes():
     prob += c[j] >= s[j] + cpm.nodes[j]['p']
 
 for j in cpm.nodes():
-    for i in cpm. predecessors(j):
+    for i in cpm.predecessors(j):
         prob += s[j] >= s[i] + cpm.nodes[i]['p']
 
 for j in cpm.nodes():
-    for i in cpm. predecessors(j):
+    for i in cpm.predecessors(j):
         prob += c[j]  >= c[i] + cpm.nodes[j]['p']
 
 eps = 1e-5
@@ -73,7 +73,7 @@ prob += (
     - eps * pulp.lpSum([c[j] for j in cpm.nodes()])
 )
 
-prob.writeLP("cpmLP.lp")
+# prob.writeLP("cpmLP.lp")
 prob.solve()
 pulp.LpStatus[prob.status]
 
