@@ -1,5 +1,5 @@
 #+title: Machine Learning: algorithms, Code Lecture 5
-#+subtitle: Trees
+#+subtitle: Bagging, forests, CV and Trees with weights
 #+author: Nicky van Foreest
 #+date: \today
 
@@ -7,8 +7,8 @@
 #+STARTUP: overview
 #+OPTIONS:  toc:1 H:2
 
-# +include: preamble_presentation.org
-#+include: preamble_handout.org
+#+include: preamble_presentation.org
+# +include: preamble_handout.org
 
 
 * Configuration for lecture                                        :noexport:
@@ -103,8 +103,6 @@ Finally, ~predict~ is just a convenience function that call the ~majority_vote~ 
 def majority_vote(self, x):
     predictions = np.array([t.predict(x) for t in self.trees])
     return np.sign(predictions.sum(axis=0))
-    # values, counts = np.unique(predictions, return_counts=True)
-    #return values[np.argmax(counts)]
 
 def predict(self, x):
     return self.majority_vote(x)
@@ -171,10 +169,10 @@ if __name__ == "__main__":
 
 ** Discussion of other code
 
-The code at this  [[https://machinelearningmastery.com/implement-bagging-scratch-python/][site]] has some shortcomings  as far as I am concerned.
-- There is one function to make bags and test them at the same time. This is weird. Such conceptual ideas should be split. Building is not the same as testing.
-- Some functions do too much. For instance, the ~gini_index~ function computes the gini index for each group and then computes the overall score too. It's better to split this. Compute a score for a group in one function, and compute the total score in another function. Like this, if you want to use another score function for a group, you just have make a change in one place, rather than two. In general, the more dependencies among different pieces of code, the buggier it becomes. It's way better to build one function for each separate task.
-- There are strange names: ~sample_size~ evokes (for me at least) an ~int~, not a ~float~. But the author uses this variable as a fraction. Why not call it ~sample_frac~?
+The code at this [[https://machinelearningmastery.com/implement-bagging-scratch-python/][site]], from which I learned quite a bit, has some shortcomings.
+- They use one function to /make/ bags and /test/ bags at the same time. This is weird: such conceptual ideas should be split.
+- Some functions do too much. For instance, the ~gini_index~ function computes the gini index for each group and then computes the overall score too. It's better to split this. Compute a score for a group in one function, and compute the total score in another function. Like this, if you want to use another score function for a group, you just have make a change in one place, rather than two. In general, the more dependencies among different pieces of code, the buggier it becomes. It's /way/ better to build one function for each separate task.
+- There are strange names: ~sample_size~ evokes (for me at least) an ~int~, not a ~float~. But the author uses this variable as a fraction. Why not call it ~sample_frac~ then?
 
 
 * Random forests
@@ -279,11 +277,15 @@ if __name__ == "__main__":
 #+end_src
 
 
-* Cross validation
+* Cross validation (CV)
 
-- Hyper parameter, example: power of the polynomial
-- Bias: bias decreases as a function of model complexity
-- Variance: variance increases as a function of model complexity, as model becomes more sensitive to the data chosen/used
+Part of a model's complexity is determined by (a) hyper parameter(s), such as the highest degree of the polynomials used to fit the data.
+
+We like to `know' the best/most robust hyper parameter(s) while balancing bias (errors due do selecting a too simple model) and variance (errors due to a too sensitive/complex model, overfitting).
+With CV we can find the values for the hyper parameter(s) that perform `best'. Once we have the best values for hyper parameter(s), we use  the /entire/ data set to fit (e.g., find $\beta$).
+
+BTW: At first I was a bit confused about this  procedure, i.e.,  we did CV, but then what? I missed the step that we use CV to find the best hyper parameters (or to see whether our fitting model makes any sense at all).  Only after some thinking, I realized that once we have the hyperparameters, we can use the entire data for fitting.
+
 
 #+begin_src python :session :results output :exports both
 import numpy as np
@@ -295,7 +297,6 @@ df = pd.read_csv("data_by_year_o.csv")
 X = df[["tempo"]].values
 Y = df["popularity"].values
 
-
 xx = X  # keep for plotting
 X = np.c_[np.ones(len(Y)), X]  # put 1 in front
 
@@ -304,33 +305,17 @@ n, p = X.shape
 K = 100
 
 loss = []
+B = int(n / K)  # fold (batch) size
 for k in range(1, K + 1):
-    # integer indices of test samples
-    test_ind = ((n / K) * (k - 1) + np.arange(1, n / K + 1) - 1).astype('int')
-    train_ind = np.setdiff1d(np.arange(n), test_ind)
-    # print(test_ind)
-    # quit()
-    # print(train_ind)
+    s = np.full(len(Y), True)  # train set
+    s[(k - 1) * B : k * B] = False  # take out the test set
 
-    X_train, y_train = X[train_ind, :], Y[train_ind]
-    X_test, y_test = X[test_ind, :], Y[test_ind]
+    X_train, y_train = X[s], Y[s]
+    X_test, y_test = X[~s], Y[~s]
 
     betahat = LA.solve(X_train.T @ X_train, X_train.T @ y_train)
     loss.append(LA.norm(y_test - X_test @ betahat) ** 2)
-
-print(sum(loss) / n)
 #+end_src
-** LOOCV ?
-
-Include some silly code. That is what happens if you only learn to use standard libraries. You will not develop the algorithmic skills that you will need in your job (even cleaning data requires algorithms, and there are no general libraries to help clean data, as it is data(format) dependent.)
-
-** Once CV is done, what to do?
-
-I found it unclear what to do after the cross-validation is done.
-The idea is this:
-- With CR we search for (a) good---searching for optimality is nearly always a mathematical deviation (disorder), based on too much playing with (believing in ) in toy models---hyper-parameter(s).
-- Once we found good hyper-parameters we fit the model on all available data.
-
 
 
 * Tree with weights
@@ -341,14 +326,16 @@ The idea is this:
 4. Making a tree with weights required much more understanding than I initially thought
 6. Finally, I realized that we are dealing with a binary tree, so $Y_i\in \{-1, 1\}$, and there can be just left and right sub trees. With this, I could make the code a bit simpler.
 
-Here is my tree with weights.
+Here is my tree with weights. The code is on github in the file ~tree_with_weights.py~.
+
+
 ** Score functions
 
 As it turns out, the /description/ of the AdaBoost algorithm in DSML does not completely match the python /implementation/ of AdaBoost in DSML.
 The subtlety is that the description uses a zero-one training loss function to compute the impurity, i.e., similar to the misclassification impurity, while the ~DecisionTreeClassifier~ of ~sklearn~ uses the Gini impurity.
 To see how to align this, I had to rethink the entire procedure.
 It's an interesting challenge to try to do this yourself.
-Below is my explanation, so in case you want to derive things yourself, stop reading.
+Spoiler allert: Below is my explanation, so in case you want to derive things yourself, stop reading.
 
 To see how to generalize the computation of score functions with weights, it seems best to follow the steps of DSML, and then see how to include weights.
 
@@ -358,10 +345,10 @@ Then the misclassification score associated to $s$ via the sets $L$ and $R$ is  
 S(s) = \frac{1}{n}\sum_{i\in L} \1{Y_i \neq -1} +
 \frac{1}{n}\sum_{i\in E} \1{Y_i \neq 1}.
 \end{align}
-Clearly, we want to find $s^{*}$ such that this is minimized.
-Let us rewrite this problem into more general form, so that we can see how include weights.
+Clearly, we want to find $s^{*}$ such that $S(s)$ is minimized.
+Let us rewrite this problem into a more general form, so that we can see how to include weights.
 
-Define for some set $A$ of points, the proportion of points with label $z\in \{-1, 1\}$ as
+Define, for some set $A$ of points, the proportion of points with label $z\in \{-1, 1\}$ as
 \begin{equation}
 p_{z}(A)= \frac{1}{|A|} \sum_{i\in A} \1{Y_i = z}.
 \end{equation}
@@ -378,12 +365,12 @@ S(s) & = \frac{|L|}{n} \frac{1}{|L|}\sum_{i\in L} \1{Y_i \neq -1} +
 &= \frac{|L|}{n} m(L) + \frac{|R|}{n} m(R).
 \end{align}
 
-Now observe that we replace the $m(L)$ and $m(R)$ by other impurity measures, for instance the Gini measure,
+Now observe that we can replace  $m(L)$ and $m(R)$ by other impurity measures, for instance the Gini measure
 \begin{equation}
 \label{eq:2}
-G(A) = \frac{1}{2} \left( 1 - p_{-1}(A)^{2} - p_{1}(A)^{2} \right),
+G(A) = \frac{1}{2} \left( 1 - p_{-1}(A)^{2} - p_{1}(A)^{2} \right).
 \end{equation}
-for a set $A$. In that case, we want to find an $s$, that induces sets $L$ and $R$ that minimize
+In that case, we want to find an $s$ (that induces sets $L$ and $R$) such that we minimize
 \begin{align}
 \label{eq:1}
 \frac{|L|}{n} G(L) + \frac{|R|}{n} G(R).
@@ -397,7 +384,8 @@ p_{z}(A, w) = \frac{\sum_{i\in A} w_{i}\1{Y_i = z}}{\sum_{i\in A} w_{i}}.
 By analogy, the weighted misclassification impurity for a set $A$ becomes
 \begin{equation}
 m(A, w) = 1-\max\{p_{-1}(A, w), p_{1}(A, w)\}.
-\end{equation} With this, the /weighted score/ of the separator $s$ that splits the set of data points into subsets $L$ and $R$ becomes
+\end{equation}
+With this, the /weighted score/ of the separator $s$ that splits the set of data points into subsets $L$ and $R$ becomes
 \begin{equation}
 \label{eq:1}
 S(s) = m(L, w) \sum_{i\in L} w_{i}  + m(R, w)\sum_{i\in R} w_{i},
@@ -405,18 +393,243 @@ S(s) = m(L, w) \sum_{i\in L} w_{i}  + m(R, w)\sum_{i\in R} w_{i},
 where we assume that $w$ is such that $\sum_{i=1}^n w_i =1$.
 And finally, we can replace the impurity $m(L, w)$ by $G(L, w)$ (defined in terms of $p_{z}(A,w)$  by analogy) and likewise for $m(R, w)$.
 
+** Implementation
+
+I am going to subclass from my earlier ~Tree~ class, the tree without weights.
+I do this on purpose so that you can understand the similarities and differences. In a `more professional' implementation, I would just use the tree with weigths, and then give the weight default values to cover the tree with uniform weights (i.e., the standard tree).
+
+#+name: imports_tree
+#+begin_src python :results none :exports code
+import numpy as np
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.datasets import make_blobs
+
+from tree_simple import Tree as SimpleTree
+#+end_src
+
+
+As explained above we need a probability with weights. Note that when there are no outcomes $Y_{i}$ equal to $z\in \{-1, 1\}$, we should return 0.
+#+name: prob_tree
+#+begin_src python :results none :exports code
+def p(Y, w, z):
+    res = w[Y == z].sum()
+    if res == 0:
+        return 0
+    return res / w.sum()
+#+end_src
+
+
+For the score I use that there just two possible observations: $-1$ and $1$.
+Thus, the implementation is a bit less generic than the one in ~tree_simple.py~. However, since we are splitting in a left and right tree, there is no need to have more options. In fact, in good code, we should check that $Y_{i} \in \{-1, 1\}$ for all $i$, and we trigger an error if this is not the case.
+
+#+name: score_tree
+#+begin_src python :results none :exports code
+def missclassify(Y, w):
+    return 1 - max(p(Y, w, -1), p(Y, w, 1))
+
+
+def gini(Y, w):
+    return 1 - p(Y, w, -1) ** 2 - p(Y, w, 1) ** 2
+#+end_src
+
+
+Here is the tree with weigths, as a subclass of the  simple tree.
+
+#+name: class tree
+#+begin_src python :results none :exports code
+class Tree(SimpleTree):
+    def score(self, s):
+        # return missclassify(self.Y[s], self.w[s])
+        return gini(self.Y[s], self.w[s])
+
+    def score_of_split(self, i, j):
+        s = self.X[:, j] <= self.X[i, j]
+        l_score = self.score(s) * self.w[s].sum() / self.w.sum()
+        r_score = self.score(~s) * self.w[~s].sum() / self.w.sum()
+        return l_score + r_score
+
+    def fit(self, X, Y, sample_weight=None):
+        if not self.test_input(X, Y):
+            print("Tree: import of data failed")
+            exit(1)
+        self.X, self.Y = X, Y
+        if sample_weight is None:
+            sample_weight = np.ones(len(Y))
+        self.w = sample_weight / sample_weight.sum()
+        self.split()
+
+    def majority_vote(self):
+        if p(self.Y, self.w, -1) >= p(self.Y, self.w, 1):
+            return -1
+        return 1
+#+end_src
+
+I'll explain the ~fit~ method in the next subsection
+
+The ~majority_vote~ method requires some attention. When using weights, we should choose the prediction with the largest probabibility.
 
 
 
-* Some examples of bad code ideas
+** Tests on input data
 
-In the bagging code, from which I learned a lot BTW, the author mixes the /construction/ of a bag with the /testing/ of bags. In my opinion that is a bad idea. These two parts of software should be split.
+Here is some simple code to demonstrate whether the input is ok or not.
+In real code this can be quite extensive. You should know that testing the input is often a good idea:  suppose for some crazy reason that the input is wrong, but your program still gives some result\ldots That is a clear recipe for disaster later.
+
+
+#+name: inputs_test tree
+#+begin_src python :results none :exports code
+def test_input(self, X, Y):
+    n, p = X.shape
+    if len(Y) != n:
+        print("Tree: len Y is not the same as the number of rows of X")
+        return False
+    if not set(np.unique(Y)).issubset([-1, 1]):
+        print("Tree: The observations Y are not all equal to -1 or 1.")
+        return False
+    return True
+#+end_src
+
+Don't take this example too seriously. There are  libraries to help you organize how to test input. Once, again, use good ideas of others on how to organize such standard tasks.
+
+** Tests
+
+Here is how to test our check on the inputs of the tree.
+#+name: test inputs tree
+#+begin_src python :results none :exports code
+def test_inputs():
+    tree = Tree()
+    X = np.arange(5).reshape(5, 1)
+    Y = np.array([1, 0, 0, 1, 1])
+    assert tree.test_input(X, Y) is False
+    Y = 2 * Y - 1
+    assert tree.test_input(X, Y) is True
+    Y = np.array([1, 0, 0, 1])
+    assert tree.test_input(X, Y) is False
+#+end_src
+
+Here are some tests for the tree class itself.
+
+#+name: test tree
+#+begin_src python :results none :exports code
+def test():
+    X = np.array(
+        [
+            [2.771244718, 1.784783929],
+            [1.728571309, 1.169761413],
+            [3.678319846, 2.81281357],
+            [3.961043357, 2.61995032],
+            [2.999208922, 2.209014212],
+            [7.497545867, 3.162953546],
+            [9.00220326, 3.339047188],
+            [7.444542326, 0.476683375],
+            [10.12493903, 3.234550982],
+            [6.642287351, 3.319983761],
+        ]
+    )
+    Y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+    Y = 2 * Y - 1
+
+    tree = Tree()
+    tree.fit(X, Y)
+    print(tree.predict(X))
+#+end_src
+
+
+
+#+name: test2 tree
+#+begin_src python :results none :exports code
+def test_2():
+    X = np.arange(5).reshape(5, 1)
+    Y = np.array([1, 0, 0, 1, 1])
+    Y = 2 * Y - 1
+    n, p = X.shape
+    w = np.ones(n)
+    w[0] = 100
+    w /= w.sum()
+
+    tree = Tree()
+    tree.fit(X, Y, sample_weight=w)
+    my_y = tree.predict(X)
+
+    clf = DecisionTreeClassifier(max_depth=1)
+    clf.fit(X, Y, sample_weight=w)
+    their_y = clf.predict(X)
+    print((my_y == their_y).all())
+    # print(clf.tree_.feature[0], clf.tree_.threshold[0], clf.tree_.impurity)
+    # sk.tree.plot_tree(clf)
+    # plt.show()
+#+end_src
+
+#+name: test3 tree
+#+begin_src python :results none :exports code
+def test_3():
+    np.random.seed(4)
+    X, Y = make_blobs(n_samples=13, n_features=3, centers=2, cluster_std=20)
+    Y = 2 * Y - 1
+    n, p = X.shape
+    w = np.random.uniform(size=n)
+    w /= w.sum()
+
+    tree = Tree()
+    tree.fit(X, Y, sample_weight=w)
+    my_y = tree.predict(X)
+
+    clf = DecisionTreeClassifier(max_depth=1)
+    clf.fit(X, Y, sample_weight=w)
+    their_y = clf.predict(X)
+    print((my_y == their_y).all())
+#+end_src
+
+
+
+
+
+** Tangle                                                         :noexport:
+
+#+begin_src python :noweb yes :exports none :tangle ../code/tree_with_weights.py
+<<imports_tree>>
+
+
+<<prob_tree>>
+
+
+<<score_tree>>
+
+
+<<class tree>>
+
+    <<inputs_test tree>>
+
+
+<<test inputs tree>>
+
+
+<<test tree>>
+
+
+<<test2 tree>>
+
+
+<<test3 tree>>
+
+
+if __name__ == "__main__":
+    test_inputs()
+    test()
+    test_2()
+    test_3()
+#+end_src
+
 
 * Exercises
-** Exercise 1,on code
-- Read  [[https://www.geeksforgeeks.org/why-import-star-in-python-is-a-bad-idea/][here]] to understand why using ~import *~ is a very bad idea. Let me be honest: DSML use this style quite a bit. What annoys me slightly about the code in the DSML is that they have very different standards about how math should look like (impeccable), and how code should look like (a bit ugly, bad formatting here and there). This is just as awkward in the other way around, correct code and wrong math.
-- Perhaps you like the explanations of this [[https://www.betterdatascience.com/mml-decision-trees/][site]].
-  1. I like that the author uses classes. Of course I like my own ~Tree~ class better. (There is no reason to have ~Node~ class and a ~DecisionTree~ class.) However, beauty is in eye of the beholder, so study which of the two you like best.
-  2. I also like that the author builds a ~fit~ method. The reason I don't do that is that this does not add much to the fundamental understanding algorithm, hence, adding a ~fit~ function adds `clutter'. (Besides we are never actually going to use these functions anyway; for real cases, we use the real thing, i.e., ~scikit~.)
-  3. I don't like the documentation in between the code. It makes it hard to focus on (and locate)  the real code. That is one of the reasons I like the concept of /literate programming/ much more. In literate programming, Code and documentation are very clearly separated, which adds much to the understanding of the code, and the text.
-- You might also like to  check this [[https://www.betterdatascience.com/mml-random-forest/][site]]. There is a point of confusion: does the author call /random forest/ what we call /bagging/? I think so, but I haven't  studied the code  in detail, so I might be wrong.
+** Exercise 1.
+Read  [[https://www.geeksforgeeks.org/why-import-star-in-python-is-a-bad-idea/][here]] to understand why using ~import *~ is a very bad idea. Let me be honest: DSML use thais style quite a bit. What annoys me slightly about the code in the DSML is that they have very different standards about how math should look like (impeccable), and how code should look like (a bit ugly, bad formatting here and there, heavy-handed design.). This is just as awkward in the other way around, correct code and wrong math.
+** Exercise 2.
+Perhaps you like the explanation of trees of this [[https://www.betterdatascience.com/mml-decision-trees/][site]].
+  1. I like that the author uses classes. Of course I like my own ~Tree~ class better. (There is no reason to have a ~Node~ class and a ~DecisionTree~ class.) However, beauty is in eye of the beholder, so study which of the two you like best.
+  2. I also like that the author builds a ~fit~ method. So I did the same.
+  3. I don't like the documentation in between the code. It makes it hard to focus on (and locate)  the real code. That is one of the reasons I like the concept of /literate programming/ much more. In literate programming, code and documentation are very clearly separated, which adds much to the understanding of the code, and the text.
+** Exercise 3.
+What's your opinion of the code on this [[https://www.betterdatascience.com/mml-random-forest/][site]]? There is a point of confusion: does the author call a /random forest/ what we call /bagging/? I think so, but I haven't  studied the code  in detail, so I might be wrong.
+** Exercise 4.
+If you are interested in preventing dumb errors when inputting data, you can consult [[https://pythonrepo.com/repo/beartype-beartype-python-code-analysis-and-linter][bear checker]].

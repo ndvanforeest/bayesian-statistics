@@ -83,7 +83,8 @@ There are other, non-obligatory, sources that you might like to consult. I liked
 - [[https://www.microsoft.com/en-us/research/uploads/prod/2006/01/Bishop-Pattern-Recognition-and-Machine-Learning-2006.pdf][Bishop, Pattern Recognition and Machine Learning]]
 
 
-
+* Coding
+The university provides a few courses on python and R  [[https://student.portal.rug.nl/infonet/studenten/feb/career-services/experience/learning-communities/][here]].
 
 *  Interesting research topics
 Here are some topics that you might find interesting. They may serve as inspiration for your own paper.

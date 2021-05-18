@@ -1,11 +1,10 @@
 import numpy as np
 
-
 def p(Y, z):
     return (Y == z).sum() / len(Y)
 
 
-def missclassify(Y):
+def missclassify( Y):
     res = np.array([p(Y, z) for z in np.unique(Y)])
     return 1 - res.max(initial=0)
 
@@ -27,12 +26,12 @@ class Tree:
         self.left, self.right = None, None
         self.split_col = None
         self.split_value = None
-        Tree.min_size = min_size
-        Tree.max_depth = max_depth
+        self.min_size = min_size
+        self.max_depth = max_depth
 
     def size(self):
         return len(self.Y)
-
+    
     def score(self, s):
         return gini(self.Y[s])
 
@@ -44,7 +43,7 @@ class Tree:
 
     def find_optimal_split(self):
         n, p = self.X.shape
-        best_score = self.score([True] * len(self.Y))
+        best_score = self.score(np.full(len(self.Y), True))
         best_row = None
         best_col = None
         for j in range(p):
@@ -52,7 +51,6 @@ class Tree:
                 score = self.score_of_split(i, j)
                 if score < best_score:
                     best_score, best_row, best_col = score, i, j
-                    # print("best", i, j, score)
         self.split_row = best_row
         self.split_col = best_col
         self.split_value = self.X[best_row, best_col]
@@ -70,7 +68,7 @@ class Tree:
         self.left.fit(self.X[s], self.Y[s])
         self.right = Tree(depth=self.depth + 1)
         self.right.fit(self.X[~s], self.Y[~s])
-
+    
     def fit(self, X, Y):
         self.X, self.Y = X, Y
         self.split()
@@ -81,6 +79,7 @@ class Tree:
     def majority_vote(self):
         values, counts = np.unique(self.Y, return_counts=True)
         return values[np.argmax(counts)]
+    
 
     def _predict(self, x):
         if self.terminal():
@@ -89,7 +88,7 @@ class Tree:
             return self.left._predict(x)
         else:
             return self.right._predict(x)
-
+    
     def predict(self, X):
         return np.array([self._predict(x) for x in X])
 
@@ -111,6 +110,7 @@ def test():
     )
     Y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
     Y = 2 * Y - 1
+
 
     Tree.max_depth = 1
     Tree.min_size = 1

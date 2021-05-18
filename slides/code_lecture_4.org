@@ -1,5 +1,5 @@
 #+title: Machine Learning: algorithms, Code Lecture 4
-#+subtitle: Trees
+#+subtitle: Recursion, a tree class
 #+author: Nicky van Foreest
 #+date: \today
 
@@ -36,58 +36,21 @@ C-u C-u C-c C-x C-l to preview all
 
 * Overview
 - Last lecture
-  - LP solvers and graphs
-  - ridge
-  - lasso
+  - LP solvers, graphs, applied to project scheduling, finding the critical path
+  - ridge regression, with direct method ($Ax = b$) and ~CVSPY~
+  - lasso regression: ~CVXPY~
 - This lecture
   - Recursion, examples
   - Decision Trees (Trees are recursive)
 - Next lecture:
   - Bagging
   - Random Forests
+    Cross Validation implementation
   - Trees with weights.
 
 * Recursion
 Recursion is an important idea in the design of computer algorithms. Here I discuss two, to help you get in the mood. Then I'll apply it to make decision trees.
-** The dumbest way to sort (hence, make recursion shine)
- Arrays  can be solved very fast with recursion.  But to see how sorting works, let us first see how /not/ to solve an array.
-
-#+begin_src python :results output :exports both
-def bublle_sort_never_use_this_as_it_is_the_dummest_algorithm_to_sort(L):
-    for i in range(len(L)):
-        for j in range(i + 1, len(L)):
-            if L[i] > L[j]:
-                L[i], L[j] = L[j], L[i]  # reverse
-
-
-L = [3, 4, 1, 8, 10]
-bublle_sort_never_use_this_as_it_is_the_dummest_algorithm_to_sort(L)
-print(L)
-#+end_src
-
-
-** Quicksort
-
-Sorting becomes much faster when using recursion. In fact, we go from  an order $n (n-1)/2 \sim O(n^{2})$ algorithm (bubble sort) to an $O(n\log n)$ algorithm.
-
-#+begin_src python :results none :exports code
-def qsort(xs):
-    if len(xs) <= 1:
-        return xs
-    left, right, pivot = [], [], xs[0]
-    for x in xs[1:]:
-        if x < pivot:
-            left.append(x)
-        if x >= pivot:
-            right.append(x)
-    return qsort(left) + [pivot] + qsort(right)
-#+end_src
-
-- Note the  boundary/stopping condition here: it's the check on the length of the list ~len(xs) <=1~. When using recursion, always think about the stopping condition. If you mis a corner case, your code will keep running. Often it will claim more and more memory, and your computer will crash.
-- /All/ sorting algoriths that you use on  the contact list on your phone,  spotify playlists, databases, use recursions.
-- Don't /use/ the above code, as we do not cope with many corner cases. The idea is that you understand how recursion works in combination with sorting.
-
-** Stationary distribution for the M/M/1 queue                    :noexport:
+** Simplest recursion: Stationary distribution for the M/M/1 queue
 
 At a queueing system, jobs arrive at a single-server station as a Poisson process with rate $\lambda$; service times are exponentially distributed with mean $1/\mu$. Then, the stationary distribution satisfies the recursion
 \begin{equation}
@@ -96,18 +59,107 @@ At a queueing system, jobs arrive at a single-server station as a Poisson proces
 \end{equation}
 Suppose at most $K$ jobs fit into the system. Then we can use this code to computate $\pi$.
 
-#+begin_src python :results none :exports code
-labda, mu= 3, 4
-
-def pi(i):
-    if i == 0:
-        return 1
-    return pi(i-1)*labda/mu
+#+begin_src python :results output :exports both
+import numpy as np
 
 
+labda, mu, K = 3, 4, 5
+
+pi = np.ones(K + 1)
+
+for k in range(1, K + 1):
+    pi[k] = pi[k - 1] * labda / mu
+
+pi /= pi.sum()
+print(pi)
 #+end_src
 
-** Betting, memoizatoin and boundary conditions.
+#+RESULTS:
+: [0.3041283  0.22809623 0.17107217 0.12830413 0.0962281  0.07217107]
+** Slightly harder: Fibonacci sequence
+
+Rabbit pairs increase per generation, supposedly, according to Fibonacci's rule:
+\begin{equation}
+F(n) = F(n-1) + F(n-2),\quad F(0) = F(1) = 1.
+\end{equation}
+
+When using recursion, /always/ think about the stopping condition. If you mis a corner case, your code will keep running. Often it will claim more and more memory, and your computer will crash.
+
+
+#+begin_src python :results output :exports both
+def F(n):
+    global called
+    called += 1
+    if n == 0 or n == 1:
+        return 1
+    return F(n - 1) + F(n - 2)
+
+
+for n in range(20):
+    called = 0
+    F(n)
+    print(n, called)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+0 1
+1 1
+2 3
+3 5
+4 9
+5 15
+6 25
+7 41
+8 67
+9 109
+10 177
+11 287
+12 465
+13 753
+14 1219
+15 1973
+16 3193
+17 5167
+18 8361
+19 13529
+#+end_example
+
+The number of times we call $F(n)$ in the course of the recursion increases very rapidly. Why is that?
+
+A reminder: this code will crash if you call ~F(0.5)~ (why?), or ~F(-1)~. In good code you should check the input.
+
+** A bit harder: use /caching/ to store information
+
+What if we would /store/ intermediate results rather then recompute them?
+The concept of storing intermediate results is known as /memoization/, or /cashing/, or /hashing/. You should memorize that when doing expensive queries on (very large) data bases you should always try to store the intermediate results.
+
+#+begin_src python :results output :exports both
+from functools import lru_cache
+
+
+@lru_cache
+def F(n):
+    global called
+    called += 1
+    if n == 0 or n == 1:
+        return 1
+    return F(n - 1) + F(n - 2)
+
+
+called = 0
+F(19)
+print(called)
+#+end_src
+
+
+Rather than doing 13529 computations, we now just need 20 calls! If you don't believe how useful memoization is, try your hand at ~F(300)~ with and without memoization. (Without memoization, you'll be dead before knowing the answer.)
+
+
+Note that in the code, we first have to check the boundary condtions. Only when we /fell through/ all conditions, we can apply the recursion.
+
+
+** Memoization to solve difference equation (finance applications),  boundary conditions.
 We have Peter and Paul betting on the outcome of a coin for $t$ rounds.
 Peter wins a dollar if it lands heads, which happens with probability $p$; if it lands tails, Paul wins a dollar.
 Peter starts with $i$ dollars, Paul with $n-i$ dollars.
@@ -123,9 +175,8 @@ u_{t, n} &= 1, \quad t\geq 0, \\
 u_{t, 0} &= 0, \quad t\geq 0, \\
 u_{0, i} &= 0, \quad 0\leq i < n.
 \end{align}
-Note again that we have to deal with /boundary conditions/, just as with quicksort.
 
-Let's turn this into code. I use /memoization/ (check the web), as this leads to nice and readable code. Note that in the code, we first have to check the boundary condtions. Only when we /fell through/ all conditions, we can apply the recursion.
+
 #+begin_src python :results output :exports both
 from functools import lru_cache
 
@@ -150,13 +201,18 @@ print(u(100, 5))
 
 #+RESULTS:
 : 0.5939863359639174
-A small detour: for the mathematically interested. The following problem (in which we removed the dependence on $t$) is a two-point boundary value problem:
+
+Using  recursion and memoization keeps the code short and very clean. (At least, I find real neat.)
+
+A small detour: for the mathematically interested. In the following problem we remove the dependence on $t$.
 \begin{align}
 u(i) &= p u( i+1)  + q u_{i-1},\\
 u(n) &= 1, \\
 u(0) &= 0.
 \end{align}
-It is simple to show that this problem has an analytic solution, but in general it is much harder to solve (numerically) two-boundary problems then differential equations with only initial conditions.
+
+Suddently we end up with a /two-point boundary value problem/.
+For this specific example it's simple to find an analytic solution, but in general two-point boundary value probles are numerically much harder to solve than differential equations with only initial conditions.
 
 *** What is the expected duration of the game?
 
@@ -164,7 +220,7 @@ Clearly, the game ends when either of the boundaries $0$ or $n$ is hit, or when 
 The recursions are simple. Let $v(t, i)$ be the expected duration of the game when there are at most $t$ rounds left and Peter starts with $i$ dollars. Then,
 \begin{align}
 v_{t, i} &= 1 + p v_{t-1, i+1}  + q v_{t-1, i-1}, \\
-v_{t, n} &= v(t, 0) = 0, \quad t\geq 0, \\
+v_{t, n} &= v_{t,0} = 0, \quad t\geq 0, \\
 v_{0, i} &= 0, \quad \text{for all } i.
 \end{align}
 #+begin_src python :results output :exports both
@@ -187,24 +243,60 @@ print(v(100, 5))
 
 
 
+** Sorting without recursion is the the dumbest way to sort
+ Arrays  can be solved very fast with recursion.  But to see how sorting works, let us first see how /not/ to solve an array.
+
+#+begin_src python :results output :exports both
+def bublle_sort_never_use_this_as_it_is_the_dummest_algorithm_to_sort(L):
+    for i in range(len(L)):
+        for j in range(i + 1, len(L)):
+            if L[i] > L[j]:
+                L[i], L[j] = L[j], L[i]  # reverse the elements
+
+
+L = [3, 4, 1, 8, 10]
+bublle_sort_never_use_this_as_it_is_the_dummest_algorithm_to_sort(L)
+print(L)
+#+end_src
+
+The complexity of this algorithm is $n(n-1)/2 \sim O(n^{2}$.
+
+
+** Quicksort
+
+Sorting becomes much faster when using recursion. In fact, we go from  an order $n (n-1)/2 \sim O(n^{2})$ algorithm (bubble sort) to an $O(n\log n)$ algorithm (quicksort).
+
+#+begin_src python :results none :exports code
+def qsort(xs):
+    if len(xs) <= 1:
+        return xs
+    left, right, pivot = [], [], xs[0]
+    for x in xs[1:]:
+        if x < pivot:
+            left.append(x)
+        if x >= pivot:
+            right.append(x)
+    return qsort(left) + [pivot] + qsort(right)
+#+end_src
+
+- Note the  boundary/stopping condition here: it's the check on the length of the list ~len(xs) <=1~.
+  /All/ sorting algoriths that you use on  the contact list on your phone,  spotify playlists, databases, use recursive sorting algoritms.
+- Don't /use/ the above code, as we do not cope with many corner cases. The idea is that you understand how recursion works in combination with sorting.
 
 * Decision Trees
 
 To build a decision tree, I started reading the code of DSML, but I did not really like the implementation.
-I found it hard to understand, and (worse perhaps) I found  the code somewhat of ugly, and unpyhonic.
+I found it hard to understand, and (worse perhaps) I found  the code somewhat ugly, and particulary `unpyhonic'.
 
 I tried to find another resource on the internet.
-Searching on the web on ~scratch decision tree~ led me to [[https://machinelearningmastery.com/implement-decision-tree-algorithm-scratch-python/][this useful site]].
+Searching on the web on ~build from scratch decision tree~ led me to [[https://machinelearningmastery.com/implement-decision-tree-algorithm-scratch-python/][this useful site]].
 However, this also was not the way I like to see trees implemented.
-In particular, they do not use classes, which makes the code a bit unorganized. In fact,
-this is a missed opportunity because for trees have a recursive structure, which can be very nicely built with classes.
-Moveover, I want to use numpy to speed up things.
-(There also points that confuse me, like the use of ~row~ and ~index~.
-I find it hard to memorize that ~index~ refers to a column of ~X~, that a ~row~ is a row of ~X~ (why not call it ~X[i,:]~?), and that ~row[-1]~ is the label ~Y~.)
-
+1. They do not use classes, which makes the code a bit unorganized. In fact, this is a missed opportunity because for trees have a recursive structure, which can be very nicely built with classes.
+2. I want to use numpy to speed up things.
+3. There also quite some points that confuse me, like the use of ~row~ and ~index~. I find it hard to memorize that ~index~ refers to a column of ~X~, that a ~row~ is a row of ~X~ (why not call it ~X[i,:]~?), and that ~row[-1]~ is the outcome/label ~Y~.
 So, I decided to build my own tree, but steal what seemed the best of the code of DSML and the above site.
 
-You can find my code on ~github~ in ~tree_simple.py~.  With the code below I just want to illustrate how such things are built. For real work, use the classes of ~sklearn~, for instnce, the class ~DecisionTreeClassifier~ of ~sklearn~ is considerably more sophisticated (but also harder to understand).
+You can find my code on ~github~ in ~tree_simple.py~.  With the code below I just want to illustrate how such things are built. For real work, use the classes of ~sklearn~ such as ~DecisionTreeClassifier~. These are considerably more sophisticated but also quite a bit harder to understand (and if you don't believe me, just check the source on github).
 
 ** Score functions
 I already know that I'll need  ascore function, so that is what I am going to build first.
@@ -258,8 +350,8 @@ A tree is a bunch of branches, but branches can have sub branches, and so on. Bu
 
 You should realize now that we are only considering /binary/ classification. So, we split in a /left/ and a /right/ subtree; there will not be a /middle/ tree, or anything else.
 
-I use two class attributes: ~Tree.max_depth~ and ~Tree.min_size~.  We don't want to split a tree when it has less than  ~min_size~ datapoints.
-We also don't want to split when a tree's depths exceeds ~max_depth~. As all subtrees in one tree must satisfy these constraints, it's is convenient to set the values as class attributes.
+We don't want to split a tree when it has less than  ~min_size~ datapoints.
+We also don't want to split when a tree's depths exceeds ~max_depth~.
 
 
 #+name: class_tree
@@ -271,12 +363,16 @@ class Tree:
         self.left, self.right = None, None
         self.split_col = None
         self.split_value = None
-        Tree.min_size = min_size
-        Tree.max_depth = max_depth
+        self.min_size = min_size
+        self.max_depth = max_depth
 #+end_src
 
 The ~X~ is the feature vector, ~Y~ the response, ~left~ and ~right~ refer to a left and right tree, if present.
 Finally, I use ~split_row~ and ~split_col~ to save the row and column of ~X~ that are optimal to split, the ~split_value=X[split_row, split_col]~ is the value to use in the optimal split.
+
+For the interested: I wanted implement the max depth and min size as class attributes~Tree.max_depth~ and ~Tree.min_size~.
+This makes sense since all subtrees in one tree must satisfy the same constraints. However, I did not see a clear way to set these variables when instantiating a tree. In the current implementation I can just pass the values to the ~__init__~ method.
+
 
 ** Two convenience methods
 
@@ -329,7 +425,7 @@ Note that we can take ~self.score(Y)~ as upper bound on the split. If none of th
 #+begin_src python :results none :exports code
 def find_optimal_split(self):
     n, p = self.X.shape
-    best_score = self.score([True] * len(self.Y))
+    best_score = self.score(np.full(len(self.Y), True))
     best_row = None
     best_col = None
     for j in range(p):
@@ -453,7 +549,6 @@ def test():
     print(tree.predict(X))
 #+end_src
 
-My final advice: Think hard about how classes work and recursion.
 We'll use the ~Tree~ class again when we will deal with boosting.
 The tree class we will use then is more difficult because we have to deal with weighted score functions.
 
@@ -497,7 +592,9 @@ if __name__ == "__main__":
 * Exercises
 
 1. Why is Quicksort an $O(n\log n)$ algorithm? (This helps you a lot in understanding how recursion works!)
-2. Define  (and do) some tests for the ~Tree~ class.  Here are some simple (and dumb) things to test:
+2. If $n=10^{6}$ (about the number of student ids in the data bases of our university), show that sorting with buttlesort takes about $10^{5}$ as long as with quicksort. Hence, memorize that $O(n^{2})/O(n\log n)$ becomes big when $n$ is big. BTW, the performance of many algorithms without memoization is terrible. Use memoization whenever you can.
+3. Think hard about how recursoins work classes.
+4. Define  (and do) some tests for the ~Tree~ class.  Here are some simple (and dumb) things to test:
    a. Test on ~min_size=0~? Should the tree crash? What should happen in that case?
    b. Test on  ~max_depth=np.infty~? Then the size of each branch should be at most ~min_size~ large. Is that indeed true?
    c. What happens if you pass ~X=[]~, i.e., an empty array to the tree?
@@ -505,9 +602,9 @@ if __name__ == "__main__":
    e. What if all values of ~Y~ are the same?
    f. What if just one value of ~Y~ is different?
    g. Can we mix positive and negative values in ~Y~ and/or ~X~? Of course, all should work, but does it actually?
-   h. If you like, add some error checking. For instance, ensure that the shapes of $X$, $Y$ and $w$ are compatible. Are the divisions by zero that can give strange errors?
-3. Compare the code of DSML and  [[https://machinelearningmastery.com/implement-decision-tree-algorithm-scratch-python/][this site]] to my code.
+   h. If you like, add some error checking. For instance, ensure that the shapes of $X$, $Y$ and $w$ are compatible. How should we deal with  divisions by zero problems?
+5. Compare the code of DSML and  [[https://machinelearningmastery.com/implement-decision-tree-algorithm-scratch-python/][this site]] to my code.
    a. What parts of each code do you like? Why?
    b. Can you see what ideas of the others I copied?
    c. Do you understand why I changed certain parts?
-   d. Think about how you would build your code based on these three examples of code.
+   d. Think about how you would build your code based on these three examples of code. And if you're into R, then try to build your own tree class with recursion.
