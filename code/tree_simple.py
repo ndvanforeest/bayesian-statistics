@@ -4,6 +4,10 @@ def p(Y, z):
     return (Y == z).sum() / len(Y)
 
 
+def gini(Y):
+    res = np.array([p(Y, z) for z in np.unique(Y)])
+    return (1 - res @ res) / 2
+
 def missclassify( Y):
     res = np.array([p(Y, z) for z in np.unique(Y)])
     return 1 - res.max(initial=0)
@@ -14,17 +18,12 @@ def entropy(Y):
     return -res @ np.log(res)
 
 
-def gini(Y):
-    res = np.array([p(Y, z) for z in np.unique(Y)])
-    return (1 - res @ res) / 2
-
-
 class Tree:
     def __init__(self, depth=0, min_size=1, max_depth=1):
         self.X, self.Y = None, None
         self.depth = depth
         self.left, self.right = None, None
-        self.split_col = None
+        self.split_col = self.split_row = None
         self.split_value = None
         self.min_size = min_size
         self.max_depth = max_depth
@@ -35,8 +34,15 @@ class Tree:
     def score(self, s):
         return gini(self.Y[s])
 
+    def fit(self, X, Y):
+        self.X, self.Y = X, Y
+        self.split()
+    
+    def predict(self, X):
+        return np.array([self._predict(x) for x in X])
+
     def score_of_split(self, i, j):
-        s = self.X[:, j] <= self.X[i, j]
+        s = self.X[:, j] <= self.X[i, j] # split on pivot
         l_score = self.score(s) * len(self.Y[s]) / len(self.Y)
         r_score = self.score(~s) * len(self.Y[~s]) / len(self.Y)
         return l_score + r_score
@@ -64,14 +70,14 @@ class Tree:
         s = self.X[:, self.split_col] <= self.split_value
         if s.all() or (~s).all():
             return
-        self.left = Tree(depth=self.depth + 1)
+        self.left = Tree(
+            depth=self.depth + 1, max_depth=self.max_depth, min_size=self.min_size
+        )
         self.left.fit(self.X[s], self.Y[s])
-        self.right = Tree(depth=self.depth + 1)
+        self.right = Tree(
+            depth=self.depth + 1, max_depth=self.max_depth, min_size=self.min_size
+        )
         self.right.fit(self.X[~s], self.Y[~s])
-    
-    def fit(self, X, Y):
-        self.X, self.Y = X, Y
-        self.split()
 
     def terminal(self):
         return self.left == None or self.right == None
@@ -88,9 +94,6 @@ class Tree:
             return self.left._predict(x)
         else:
             return self.right._predict(x)
-    
-    def predict(self, X):
-        return np.array([self._predict(x) for x in X])
 
 
 def test():
@@ -112,8 +115,6 @@ def test():
     Y = 2 * Y - 1
 
 
-    Tree.max_depth = 1
-    Tree.min_size = 1
     tree = Tree()
     tree.fit(X, Y)
     print(tree.predict(X))

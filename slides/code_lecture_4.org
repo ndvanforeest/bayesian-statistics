@@ -1,5 +1,5 @@
 #+title: Machine Learning: algorithms, Code Lecture 4
-#+subtitle: Recursion, a tree class
+#+subtitle: Recursion and Decision Trees
 #+author: Nicky van Foreest
 #+date: \today
 
@@ -9,8 +9,8 @@
 
 #+PROPERTY: header-args    :session
 
-#+include: preamble_presentation.org
-# +include: preamble_handout.org
+# +include: preamble_presentation.org
+#+include: preamble_handout.org
 
 
 * Configuration for lecture                                        :noexport:
@@ -49,8 +49,15 @@ C-u C-u C-c C-x C-l to preview all
   - Trees with weights.
 
 * Recursion
-Recursion is an important idea in the design of computer algorithms. Here I discuss two, to help you get in the mood. Then I'll apply it to make decision trees.
-** Simplest recursion: Stationary distribution for the M/M/1 queue
+Recursion is an important idea in the design of computer algorithms. Here I discuss a few, to help you get in the mood. Then I'll apply the idea of recursion to make decision trees.
+
+The idea of the lecture is to help you think recursively. Once you understand how recursion works, the implementation of the ~Tree~ class will be much more natural.
+
+
+The main idea of recursion is do just a tiny bit of work, and pass on the problem to another instance, but with a /smaller/ data set. (It's a bit like a manager: do as little as possible, and pass on the problem to somebody else.)
+
+
+** Simplest recursion: Stationary distribution for the M/M/1 queue   :noexport:
 
 At a queueing system, jobs arrive at a single-server station as a Poisson process with rate $\lambda$; service times are exponentially distributed with mean $1/\mu$. Then, the stationary distribution satisfies the recursion
 \begin{equation}
@@ -76,14 +83,15 @@ print(pi)
 
 #+RESULTS:
 : [0.3041283  0.22809623 0.17107217 0.12830413 0.0962281  0.07217107]
-** Slightly harder: Fibonacci sequence
+** Fibonacci sequence
 
 Rabbit pairs increase per generation, supposedly, according to Fibonacci's rule:
 \begin{equation}
 F(n) = F(n-1) + F(n-2),\quad F(0) = F(1) = 1.
 \end{equation}
 
-When using recursion, /always/ think about the stopping condition. If you mis a corner case, your code will keep running. Often it will claim more and more memory, and your computer will crash.
+When using recursion, /always/ think about the stopping condition. If you mis a corner case, your code will keep running. Often it will claim more and more memory, and your computer will crash.  Stopping conditions should be /complete/: the  code below will crash if you call ~F(0.5)~ (why?), or ~F(-1)~. (In good code you should check the input.)
+
 
 
 #+begin_src python :results output :exports both
@@ -127,7 +135,6 @@ for n in range(20):
 
 The number of times we call $F(n)$ in the course of the recursion increases very rapidly. Why is that?
 
-A reminder: this code will crash if you call ~F(0.5)~ (why?), or ~F(-1)~. In good code you should check the input.
 
 ** A bit harder: use /caching/ to store information
 
@@ -162,7 +169,7 @@ Note that in the code, we first have to check the boundary condtions. Only when 
 ** Memoization to solve difference equation (finance applications),  boundary conditions.
 We have Peter and Paul betting on the outcome of a coin for $t$ rounds.
 Peter wins a dollar if it lands heads, which happens with probability $p$; if it lands tails, Paul wins a dollar.
-Peter starts with $i$ dollars, Paul with $n-i$ dollars.
+Peter starts with \(i\) dollars, Paul with $n-i$ dollars.
 Peter wins when during the course of the game he ends up with all $n$ dollars.
 When he has not won all $n$ dollars before $t=0$, or Paul won all $n$ dollars, Peter looses.
 
@@ -279,8 +286,10 @@ def qsort(xs):
     return qsort(left) + [pivot] + qsort(right)
 #+end_src
 
+- We assume that the order in the initial array is random. Hence, ~xs[0]~ has an arbitrary value.
+- Once, again, the algorithm does a bit work, and passes on the rest of the work to instances, but with /less/ data.
 - Note the  boundary/stopping condition here: it's the check on the length of the list ~len(xs) <=1~.
-  /All/ sorting algoriths that you use on  the contact list on your phone,  spotify playlists, databases, use recursive sorting algoritms.
+- /All/ sorting algoriths that you use on  the contact list on your phone,  spotify playlists, databases, use recursive sorting algoritms.
 - Don't /use/ the above code, as we do not cope with many corner cases. The idea is that you understand how recursion works in combination with sorting.
 
 * Decision Trees
@@ -298,20 +307,20 @@ So, I decided to build my own tree, but steal what seemed the best of the code o
 
 You can find my code on ~github~ in ~tree_simple.py~.  With the code below I just want to illustrate how such things are built. For real work, use the classes of ~sklearn~ such as ~DecisionTreeClassifier~. These are considerably more sophisticated but also quite a bit harder to understand (and if you don't believe me, just check the source on github).
 
-** Score functions
-I already know that I'll need  ascore function, so that is what I am going to build first.
+** Think a bit!
 
-Before building the score, we need  $p(z)$:
+Before building a decision  tree, we need to think a bit on the design. For this, we can use (at least) three questions:
+1. What is the purpose of a decision tree?
+2. How to use recursion, i.e., what should `the manager' do, and what data should s/he pass on to a lower level?
+3. When to stop, i.e., identify stopping conditions.
+
+** Score functions
+I know that I'll need  a score function to split the data into subsets. So that is what I am going to build first.
+
+Before building the score, we need  the fraction $p(z)$ of elements in a set $\sigma$ with value $z$:
 \begin{align}
 p_{z} &= \frac{1}{|\sigma|} \sum_{y \in \sigma}\1{y=z}.
 \end{align}
-
-# Later, when we will consider /boosting/ we need a more general function $p(z)$ that takes into account the weights of (mis)classifying a point. When $w(y)$ is this weight, with the vector $w$ such that $\sum_{y\in \sigma} w(y) = 1$, then define
-# \begin{align}
-# p_{z} &= \sum_{y \in \sigma} w(y)\1{y=z}.
-# \end{align}
-# In case $w(y) = 1/|\sigma|$, we retrieve our earlier function
-
 
 I'll use Gini's impurity function to score the misclassificaton of the tree. From the definitions of DSML:
 \begin{align}
@@ -327,6 +336,10 @@ def p(Y, z):
     return (Y == z).sum() / len(Y)
 
 
+def gini(Y):
+    res = np.array([p(Y, z) for z in np.unique(Y)])
+    return (1 - res @ res) / 2
+
 def missclassify( Y):
     res = np.array([p(Y, z) for z in np.unique(Y)])
     return 1 - res.max(initial=0)
@@ -335,18 +348,13 @@ def missclassify( Y):
 def entropy(Y):
     res = np.array([p(Y, z) for z in np.unique(Y)])
     return -res @ np.log(res)
-
-
-def gini(Y):
-    res = np.array([p(Y, z) for z in np.unique(Y)])
-    return (1 - res @ res) / 2
 #+end_src
 
  Below you will see that I'll associate a score function to the ~Tree~ class.
 
-** A tree class
+** The tree class
 
-A tree is a bunch of branches, but branches can have sub branches, and so on. But, since a branch behaves like a tree, it suffices to just have one ~Tree~ class. Left and right branches are then also trees.
+A tree is a bunch of branches; branches can have sub branches, and so on. But, since a branch behaves like a tree, it suffices to just have one ~Tree~ class. Left and right branches are then also trees.
 
 You should realize now that we are only considering /binary/ classification. So, we split in a /left/ and a /right/ subtree; there will not be a /middle/ tree, or anything else.
 
@@ -361,7 +369,7 @@ class Tree:
         self.X, self.Y = None, None
         self.depth = depth
         self.left, self.right = None, None
-        self.split_col = None
+        self.split_col = self.split_row = None
         self.split_value = None
         self.min_size = min_size
         self.max_depth = max_depth
@@ -370,16 +378,18 @@ class Tree:
 The ~X~ is the feature vector, ~Y~ the response, ~left~ and ~right~ refer to a left and right tree, if present.
 Finally, I use ~split_row~ and ~split_col~ to save the row and column of ~X~ that are optimal to split, the ~split_value=X[split_row, split_col]~ is the value to use in the optimal split.
 
-For the interested: I wanted implement the max depth and min size as class attributes~Tree.max_depth~ and ~Tree.min_size~.
+For the interested: I wanted implement the max depth and min size as class attributes ~Tree.max_depth~ and ~Tree.min_size~.
 This makes sense since all subtrees in one tree must satisfy the same constraints. However, I did not see a clear way to set these variables when instantiating a tree. In the current implementation I can just pass the values to the ~__init__~ method.
 
 
-** Two convenience methods
+** Convenience methods
 
 The size of a tree is determined by the number of datapoints it contains.
 For this I can just check on ~len(self.Y)~, but I prefer to read ~self.size()~; this saves me thinking what about the meaning of ~len(self.Y)~. (Later, perhaps even tomorrow, I might be thinking why I am interested in the length of ~Y~, while ~size~ tells me directly what I wanted to do.)
 
 It's more robust to call the ~score~ method everywhere. This hides the details of the exact score function I want to use. If later I would prefer  another score function, I can leave the rest code untouched; I only have the change  ~gini~ to, e.g., ~entropy~. The argument ~s~ is a vector with true/false values. When ~s[i] = True~, we include ~Y[i]~ in the score, otherwise not.
+
+
 
 #+NAME: convenience
 #+BEGIN_SRC python :noweb yes :results none :exports code
@@ -392,12 +402,26 @@ def score(self, s):
 
 Later, when building trees with weights, we'll see that it's convenient to pass a selector ~s~ to the score method, rather than ~self.Y[s]~.
 
+** API
+
+The ~fit~ and ~predict~ methods are meant to offer the same API as the classes of ~sklearn~. We'll build the ~split~ and ~_predict~ methods below.
+
+#+NAME: api
+#+BEGIN_SRC python :noweb yes :results none :exports code
+def fit(self, X, Y):
+    self.X, self.Y = X, Y
+    self.split()
+
+def predict(self, X):
+    return np.array([self._predict(x) for x in X])
+#+end_src
+
 ** Score of a split
 
 We want to split the data ~X~ along column ~j~.
 Then for a given ~value~, we should put all rows ~X[row,col] <= value~ in the left tree, and the rest in the right tree.
 The selector ~s=X[:,j] <= value~ gives all rows that have to go the left tree.
-The value we need to split is the $i$th element of $X$ in column $j$.
+The value we need to split is the \(i\)th element of $X$ in column $j$.
 By inverting the selector, i.e., ~~s~, I get data that thas to go the right tree.
 
 The value to use in the split is given by ~X[i,j]~.
@@ -408,7 +432,7 @@ The score of the split is the score of the left and right nodes, each weigthed a
 #+name: score_of_a_split
 #+begin_src python :results none :exports code
 def score_of_split(self, i, j):
-    s = self.X[:, j] <= self.X[i, j]
+    s = self.X[:, j] <= self.X[i, j] # split on pivot
     l_score = self.score(s) * len(self.Y[s]) / len(self.Y)
     r_score = self.score(~s) * len(self.Y[~s]) / len(self.Y)
     return l_score + r_score
@@ -441,13 +465,14 @@ def find_optimal_split(self):
 ** Do the split
 
 Once I know the optimal split, I just have to implement the split.
-However, if the size of the tree is too small of if ~max_depth~ is reached, I should not split.
-Also, if the best split does not reduce the score, then ~self.split_row~ is still ~None~, and we should not split.
-Finally, if after an optimal split, the left or right tree is empty, there is also nothing to split.
-
-If we can make a good split, then do it, and then fit the left and right tree to the subsets of the data each of them receaves.
-Since these trees are instances of ~Tree~, we can leave the process of fitting entirely to each of the trees themselves.
-This is the beauty, but perhaps also a bit of the magic, of recursion.
+However, we should not split when:
+1. the size of the tree is less or equal to ~min_size~;
+2. ~max_depth~ is reached;
+3. the best split does not reduce the score;
+4. after an optimal split, either the left or right tree is empty.
+Otherwise,  we can make a good split, then we do it, and fit the left and right tree to the subsets of the data each of them receaves.
+Since these trees are instances of ~Tree~, we can leave the process of fitting entirely to each of the sub trees themselves.
+This is the beauty, but perhaps also a bit of the magic, of recursion. (Once, again, the idea is to not do much yourself;  pass on the work to somebody else, but ensure that there is less work  to do for the other person.)
 
 
 #+name: do_split
@@ -461,16 +486,34 @@ def split(self):
     s = self.X[:, self.split_col] <= self.split_value
     if s.all() or (~s).all():
         return
-    self.left = Tree(depth=self.depth + 1)
+    self.left = Tree(
+        depth=self.depth + 1, max_depth=self.max_depth, min_size=self.min_size
+    )
     self.left.fit(self.X[s], self.Y[s])
-    self.right = Tree(depth=self.depth + 1)
+    self.right = Tree(
+        depth=self.depth + 1, max_depth=self.max_depth, min_size=self.min_size
+    )
     self.right.fit(self.X[~s], self.Y[~s])
-
-def fit(self, X, Y):
-    self.X, self.Y = X, Y
-    self.split()
 #+end_src
 
+** Predict
+
+If the search to classify a new feature vector ~x~ (note that this is normal letter, not a capital) along the trees reaches a terminal tree, then return its majority vote.
+Otherwise, for that tree I know I have to split along the optimal column ~self.split_col~ and compare ~x[self.split_col]~ with the best value ~self.split_value~.
+Depending on the outcome, I can leave the rest of the prediction to the left or right tree.
+
+The method ~predict~ is a convenience function that can be applied to a matrix $X$, say, of data, not just one observation.
+
+#+name: predict
+#+begin_src python :results none :exports code
+def _predict(self, x):
+    if self.terminal():
+        return self.majority_vote()
+    if x[self.split_col] <= self.split_value:
+        return self.left._predict(x)
+    else:
+        return self.right._predict(x)
+#+end_src
 ** Terminate the split
 
 I need to know when a tree is a terminal(end) tree, because when the search has reached a terminal node, the tree should return a classifier of the terminal node.
@@ -496,27 +539,6 @@ def majority_vote(self):
 
 #+end_src
 
-** Predict
-
-If the search to classify a new feature vector ~x~ (note that this is normal letter, not a capital) along the trees reaches a terminal tree, then return its majority vote.
-Otherwise, for that tree I know I have to split along the optimal column ~self.split_col~ and compare ~x[self.split_col]~ with the best value ~self.split_value~.
-Depending on the outcome, I can leave the rest of the prediction to the left or right tree.
-
-The method ~predict~ is a convenience function that can be applied to a matrix $X$, say, of data, not just one observation.
-
-#+name: predict
-#+begin_src python :results none :exports code
-def _predict(self, x):
-    if self.terminal():
-        return self.majority_vote()
-    if x[self.split_col] <= self.split_value:
-        return self.left._predict(x)
-    else:
-        return self.right._predict(x)
-
-def predict(self, X):
-    return np.array([self._predict(x) for x in X])
-#+end_src
 ** A test
 
 Here is some test code.
@@ -542,8 +564,6 @@ def test():
     Y = 2 * Y - 1
 
 
-    Tree.max_depth = 1
-    Tree.min_size = 1
     tree = Tree()
     tree.fit(X, Y)
     print(tree.predict(X))
@@ -565,6 +585,8 @@ import numpy as np
 <<class_tree>>
 
     <<convenience>>
+
+    <<api>>
 
     <<score_of_a_split>>
 
