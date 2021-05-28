@@ -10,25 +10,24 @@ class Boost:
 
     def fit(self, X, Y):
         self.g0 = Y.mean()
-        residuals = Y - self.gamma * self.g0
+        residuals = Y - self.g0
         self.learners = []
 
         for b in range(self.rounds):
-            cls = DecisionTreeRegressor(max_depth=1)
-            cls.fit(X, residuals)
-            residuals -= self.gamma * cls.predict(X)
-            self.learners.append(cls)
+            clf = DecisionTreeRegressor(max_depth=1)
+            clf.fit(X, residuals)
+            residuals -= self.gamma * clf.predict(X)
+            self.learners.append(clf)
 
     def predict(self, x):
-        y = self.g0 + sum(l.predict(x) for l in self.learners)
-        return self.gamma * y
+        y = self.g0
+        y += self.gamma*sum(l.predict(x) for l in self.learners)
+        return y
 
 def test():
     X, Y = make_regression(n_samples=5, n_features=1, n_informative=1, noise=10)
 
-    rounds = 10
-
-    boost = Boost(gamma=0.05, rounds=rounds)
+    boost = Boost(gamma=0.05, rounds=10)
     boost.fit(X, Y)
     y = boost.predict(np.array([[3]]))
     print(y)
@@ -50,6 +49,7 @@ def make_plots():
 
     plt.legend()
     plt.show()
+    # plt.savefig("boost_test.pdf")
 
 if __name__ == "__main__":
     test()

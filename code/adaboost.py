@@ -2,11 +2,6 @@ import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.tree import DecisionTreeClassifier
 
-from tree import Tree
-
-Classifier = DecisionTreeClassifier
-# Classifier = Tree
-
 
 class AdaBoost:
     def __init__(self, rounds):
@@ -19,7 +14,7 @@ class AdaBoost:
         self.learners = []
 
         for b in range(self.rounds):
-            clf = Classifier(max_depth=1)
+            clf = DecisionTreeClassifier(max_depth=1)
             clf.fit(X, Y, sample_weight=w)
             self.learners.append(clf)
             y = clf.predict(X)
