@@ -19,7 +19,7 @@ def entropy(Y):
 
 
 class Tree:
-    def __init__(self, depth=0, min_size=1, max_depth=1):
+    def __init__(self, depth=0, min_size=1, max_depth=1, score_fn=gini):
         self.X, self.Y = None, None
         self.depth = depth
         self.left, self.right = None, None
@@ -27,12 +27,14 @@ class Tree:
         self.split_value = None
         self.min_size = min_size
         self.max_depth = max_depth
+        self.score_fn = score_fn  # score function
 
     def size(self):
         return len(self.Y)
     
     def score(self, s):
-        return gini(self.Y[s])
+        return self.score_fn(self.Y[s])
+        #return gini(self.Y[s])
 
     def fit(self, X, Y):
         self.X, self.Y = X, Y

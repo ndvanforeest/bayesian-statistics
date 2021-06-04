@@ -365,7 +365,7 @@ We also don't want to split when a tree's depths exceeds ~max_depth~.
 #+name: class_tree
 #+begin_src python :results none :exports code
 class Tree:
-    def __init__(self, depth=0, min_size=1, max_depth=1):
+    def __init__(self, depth=0, min_size=1, max_depth=1, score_fn=gini):
         self.X, self.Y = None, None
         self.depth = depth
         self.left, self.right = None, None
@@ -373,6 +373,7 @@ class Tree:
         self.split_value = None
         self.min_size = min_size
         self.max_depth = max_depth
+        self.score_fn = score_fn  # score function
 #+end_src
 
 The ~X~ is the feature vector, ~Y~ the response, ~left~ and ~right~ refer to a left and right tree, if present.
@@ -397,7 +398,8 @@ def size(self):
     return len(self.Y)
 
 def score(self, s):
-    return gini(self.Y[s])
+    return self.score_fn(self.Y[s])
+    #return gini(self.Y[s])
 #+end_src
 
 Later, when building trees with weights, we'll see that it's convenient to pass a selector ~s~ to the score method, rather than ~self.Y[s]~.

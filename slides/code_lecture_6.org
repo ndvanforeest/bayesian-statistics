@@ -340,10 +340,14 @@ We have a web site on which we offer something to sell, e.g., hotel rooms. We ha
 2. Seduce visitors into buying something, or making a reservation for a hotel room, for instance. In other words, we want to turn a visitor into a /customer/.
 The second step is called /conversion/: visitors cost resources, paying visitors bring in money. Hence, in web design, increasing the /conversion rate/, the fraction of  visitors that buy something, is very important. The basis question is thus: How to increase the conversion rate?
 
+
 As the conversion rate might depend on the design of the web pages, companies try many different designs.
 Let's look at a simple example. Suppose we have a web page with the button *BUY* in green, and we have another page that looks the same except that the button to buy is in red and has the text /Buy now/. Does the appearance of the button affect the conversion rate?
 
 How would you try to find this out?
+
+This problem is known in the literature as A/B testing. Here I illustrate the problem for web sites, but the problem occurs in many more different settings, such as medicine testing.
+
 
 ** Some simple ideas
 
